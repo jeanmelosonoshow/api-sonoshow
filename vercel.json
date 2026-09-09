@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60,
+      "includeFiles": "{config/**,sql/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/usuarios", "destination": "/api/usuarios" },
+    { "source": "/vendas", "destination": "/api/vendas" },
+    { "source": "/internal/snapshot", "destination": "/api/snapshot" },
+    { "source": "/health", "destination": "/api/health" }
+  ]
+}

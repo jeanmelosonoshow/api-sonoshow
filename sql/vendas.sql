@@ -1,0 +1,11 @@
+-- PENDENTE: inserir o SELECT de vendas.
+-- Aliases: filial_cnpj, pedido_id, nota_numero, pedido_data_venda, vendedor,
+-- produto_id, produto_qtd, produto_valor, produto_desconto.
+-- pedido_data_venda: texto no formato YYYY-MM-DD HH:MM:SS (horario do ERP).
+-- Retorne o conjunto completo do periodo que sera disponibilizado no cache.
+-- O SELECT deve aplicar estes parametros no campo NATIVO de data da venda:
+-- WHERE sua_coluna_data >= CAST(:date_start AS TIMESTAMP)
+--   AND sua_coluna_data < CAST(:date_end_exclusive AS TIMESTAMP)
+-- Nao aplique CAST/FUNCTION na coluna: mantenha-a disponivel para uso de indice.
+-- Modo 1: limites solicitados, nunca antes de sales.initialDate nem apos hoje.
+-- Modo 2: maior entre sales.initialDate e hoje-60, ate hoje.

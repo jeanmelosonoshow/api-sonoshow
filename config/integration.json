@@ -1,0 +1,18 @@
+{
+  "mode": 2,
+  "sales": {
+    "initialDate": null,
+    "lookbackDays": 60,
+    "timeZone": "America/Sao_Paulo"
+  },
+  "cache": {
+    "key": "sonoshow:clubmoveleiro:v1:snapshot",
+    "ttlSeconds": 3600
+  },
+  "limits": {
+    "maxPayloadBytes": 3000000,
+    "maxRowsPerDataset": 20000,
+    "maxProducts": 2000,
+    "requestTimeoutMs": 20000
+  }
+}

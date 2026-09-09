@@ -1,0 +1,14 @@
+{
+  "name": "api-sonoshow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20.11.0" },
+  "scripts": {
+    "start": "node --env-file=.env scripts/serve.js",
+    "sync": "node --env-file=.env scripts/sync-windows.js",
+    "sync:check": "node --env-file=.env scripts/sync-windows.js --check",
+    "test": "node --test"
+  },
+  "dependencies": { "node-firebird": "2.16.0" }
+}
