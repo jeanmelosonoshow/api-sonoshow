@@ -14,7 +14,7 @@ try {
   const extractedAt = new Date().toISOString();
   const window = salesWindow(config, new Date(extractedAt));
   const read = createFirebirdReader(config);
-  const snapshot = { schemaVersion: 2, extractedAt, salesWindow: window };
+  const snapshot = { schemaVersion: 3, extractedAt, salesWindow: window };
   for (const dataset of ['usuarios', 'vendas']) {
     snapshot[dataset] = normalizeRows(dataset, await read(dataset, window), config.limits.maxRowsPerDataset);
   }

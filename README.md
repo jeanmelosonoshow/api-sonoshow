@@ -86,7 +86,9 @@ Os SELECTs estao em `sql/usuarios.sql` e `sql/vendas.sql`. Ainda falta executa-l
 
 Aliases de usuarios: `nome`, `filial`, `filial_nome`, `filial_estado`, `filial_cidade`, `filial_regional`, `documento`, `cargo`, `responsavel`.
 
-Aliases de vendas: `filial_cnpj`, `pedido_id`, `nota_numero`, `pedido_data_venda`, `vendedor`, `produto_id`, `produto_ean`, `produto_qtd`, `produto_valor`, `produto_desconto`.
+Aliases de vendas: `filial_cnpj`, `pedido_id`, `nota_numero`, `pedido_data_venda`, `vendedor`, `produto_id`, `produto_ean`, `produto_descricao`, `produto_qtd`, `produto_valor`, `produto_desconto`, `fornecedor_cnpj`, `fornecedor_razao`, `fornecedor_fantasia`.
+
+Quando a nota fiscal ainda não tiver sido emitida, `nota_numero` será enviado como texto com valor `"0"`.
 
 - Aliases em maiusculas tambem sao aceitos.
 - CPF/CNPJ e identificadores devem vir como texto, preservando zeros iniciais. CPF/CNPJ podem vir com ou sem pontuacao; a API aplica a mascara. A validacao de formato nao verifica digitos verificadores.
@@ -145,7 +147,7 @@ Modo 1 exige endereco Firebird alcancavel a partir da Vercel. IP privado, `127.0
 
 `POST /vendas` recebe `{ "produtos": ["001", "002"] }` e retorna `{ "vendas": [...] }`. Query parameters opcionais: `date_start` e `date_end`, ambos no formato `YYYY-MM-DD HH:MM:SS`, com limites inclusivos. No modo 1, a ausencia de `date_start` assume o inicio do dia atual, e uma data informada nao pode ser anterior a `sales.initialDate`. No modo 2, os parametros apenas estreitam a janela de 90 dias armazenada. Uma lista vazia de produtos retorna vendas vazias, nao todos os produtos. Cada item retornado inclui `produto_ean`.
 
-`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 2, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...] }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
+`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 3, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...] }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
 
 `GET /health` exige o token de leitura e informa processo ativo e modo. Nao comprova acesso ao Firebird nem frescor do cache.
 

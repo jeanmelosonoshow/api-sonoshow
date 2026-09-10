@@ -20,9 +20,10 @@ const usuario = { NOME: 'Teste', FILIAL: '111222000133', FILIAL_NOME: 'Loja', FI
   FILIAL_CIDADE: 'Cidade', FILIAL_REGIONAL: 'Regional', DOCUMENTO: '100200304', CARGO: 'Gerente', RESPONSAVEL: null };
 const sale = (id, date) => ({ filial_cnpj: '111222000133', pedido_id: '0001', nota_numero: '0002',
   pedido_data_venda: date, vendedor: '100200304', produto_id: id, produto_ean: `0789000000${id}`,
-  produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0 });
+  produto_descricao: `Produto ${id}`, produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0,
+  fornecedor_cnpj: '98765432000110', fornecedor_razao: 'Fornecedor Teste Ltda', fornecedor_fantasia: 'Fornecedor Teste' });
 const vendas = [sale('001', '2026-09-01 10:00:00'), sale('002', '2026-09-02 10:00:00'), sale('001', '2026-09-03 10:00:00')];
-const snapshot = () => ({ schemaVersion: 2, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
+const snapshot = () => ({ schemaVersion: 3, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
 
 async function withApi(options, fn) {
   const server = createServer(createHandler({ env, config: testConfig(), now: () => testNow, ...options }));
@@ -56,6 +57,10 @@ test('modos 1 e 2 preservam contrato, mascaras e filtros inclusivos', async () =
       assert.equal(result.body.vendas.length, 1);
       assert.equal(result.body.vendas[0].pedido_id, '0001');
       assert.equal(result.body.vendas[0].produto_ean, '0789000000001');
+      assert.equal(result.body.vendas[0].produto_descricao, 'Produto 001');
+      assert.equal(result.body.vendas[0].fornecedor_cnpj, '98.765.432/0001-10');
+      assert.equal(result.body.vendas[0].fornecedor_razao, 'Fornecedor Teste Ltda');
+      assert.equal(result.body.vendas[0].fornecedor_fantasia, 'Fornecedor Teste');
       const empty = await call('/vendas', { method: 'POST', body: { produtos: [] } });
       assert.deepEqual(empty.body, { vendas: [] });
       assert.equal(reads, 2);
@@ -163,6 +168,12 @@ test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.match(vendasSql, /:date_start/i);
   assert.match(vendasSql, /:date_end_exclusive/i);
   assert.match(vendasSql, /produto_ean/i);
+  assert.match(vendasSql, /JOIN FORNECEDOR FO ON FO\.IDFORNECEDOR = P\.IDULTIMOFORNECEDOR/i);
+  assert.match(vendasSql, /fornecedor_cnpj/i);
+  assert.match(vendasSql, /fornecedor_fantasia/i);
+  assert.match(vendasSql, /fornecedor_razao/i);
+  assert.match(vendasSql, /produto_descricao/i);
+  assert.match(vendasSql, /COALESCE\(NULLIF\(TRIM\(CAST\(L\.NUMERONF AS VARCHAR\(50\)\)\), ''\), '0'\) nota_numero/i);
 });
 
 test('vendas repetidas sao preservadas para o Club substituir o periodo', async () => {
@@ -173,6 +184,15 @@ test('vendas repetidas sao preservadas para o Club substituir o periodo', async 
     });
     assert.equal(result.status, 200);
     assert.equal(result.body.vendas.length, 2);
+  });
+});
+
+test('venda sem numero de nota usa zero enquanto a nota fiscal nao foi emitida', async () => {
+  const withoutInvoice = { ...sale('001', '2026-09-01 10:00:00'), nota_numero: null };
+  await withApi({ cache: { read: async () => ({ ...snapshot(), vendas: [withoutInvoice] }) } }, async call => {
+    const result = await call('/vendas', { method: 'POST', body: { produtos: ['001'] } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.vendas[0].nota_numero, '0');
   });
 });
 

@@ -36,7 +36,7 @@ export function createCache(config, env = process.env, fetcher = fetch) {
       if (raw === null) throw new AppError(503, 'CACHE_EMPTY', 'Cache ausente ou expirado. Execute a sincronizacao no Windows.');
       try {
         const snapshot = JSON.parse(raw);
-        if (snapshot.schemaVersion !== 2 || !Array.isArray(snapshot.usuarios) || !Array.isArray(snapshot.vendas) ||
+        if (snapshot.schemaVersion !== 3 || !Array.isArray(snapshot.usuarios) || !Array.isArray(snapshot.vendas) ||
             !Number.isFinite(Date.parse(snapshot.extractedAt)) || Date.parse(snapshot.extractedAt) > Date.now() + 60000 ||
             Date.now() - Date.parse(snapshot.extractedAt) >= config.cache.maxAgeSeconds * 1000) throw new Error();
         return snapshot;

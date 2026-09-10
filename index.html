@@ -344,23 +344,31 @@
       <span class="code-key">"vendedor"</span>: <span class="code-value">"123.456.789-00"</span>,
       <span class="code-key">"produto_id"</span>: <span class="code-value">"001"</span>,
       <span class="code-key">"produto_ean"</span>: <span class="code-value">"7890000000001"</span>,
+      <span class="code-key">"produto_descricao"</span>: <span class="code-value">"Sofá retrátil 3 lugares"</span>,
       <span class="code-key">"produto_qtd"</span>: 2,
       <span class="code-key">"produto_valor"</span>: 899.9,
-      <span class="code-key">"produto_desconto"</span>: 50
+      <span class="code-key">"produto_desconto"</span>: 50,
+      <span class="code-key">"fornecedor_cnpj"</span>: <span class="code-value">"98.765.432/0001-10"</span>,
+      <span class="code-key">"fornecedor_razao"</span>: <span class="code-value">"Fornecedor Exemplo Ltda"</span>,
+      <span class="code-key">"fornecedor_fantasia"</span>: <span class="code-value">"Fornecedor Exemplo"</span>
     }
   ]
 }</code></pre></div></div>
               <div class="subsection"><h3>Campos retornados</h3><div class="table-wrap"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>
                 <tr><td><code>filial_cnpj</code></td><td>texto</td><td>CNPJ formatado da filial.</td></tr>
                 <tr><td><code>pedido_id</code></td><td>texto</td><td>Identificador do pedido.</td></tr>
-                <tr><td><code>nota_numero</code></td><td>texto</td><td>Número da nota fiscal.</td></tr>
+                <tr><td><code>nota_numero</code></td><td>texto</td><td>Número da nota fiscal; recebe <code>"0"</code> enquanto a nota ainda não foi emitida.</td></tr>
                 <tr><td><code>pedido_data_venda</code></td><td>texto</td><td>Data e hora da venda.</td></tr>
                 <tr><td><code>vendedor</code></td><td>texto</td><td>CPF formatado do vendedor.</td></tr>
                 <tr><td><code>produto_id</code></td><td>texto</td><td>Código interno do produto, usado também no filtro.</td></tr>
                 <tr><td><code>produto_ean</code></td><td>texto</td><td>Código EAN do produto.</td></tr>
+                <tr><td><code>produto_descricao</code></td><td>texto</td><td>Descrição do produto.</td></tr>
                 <tr><td><code>produto_qtd</code></td><td>número</td><td>Quantidade vendida.</td></tr>
                 <tr><td><code>produto_valor</code></td><td>número</td><td>Valor unitário do produto.</td></tr>
                 <tr><td><code>produto_desconto</code></td><td>número</td><td>Valor de desconto associado ao item.</td></tr>
+                <tr><td><code>fornecedor_cnpj</code></td><td>texto</td><td>CNPJ formatado do fornecedor.</td></tr>
+                <tr><td><code>fornecedor_razao</code></td><td>texto</td><td>Razão social do fornecedor.</td></tr>
+                <tr><td><code>fornecedor_fantasia</code></td><td>texto</td><td>Nome fantasia do fornecedor.</td></tr>
               </tbody></table></div></div>
             </div>
           </article>

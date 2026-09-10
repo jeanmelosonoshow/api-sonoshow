@@ -1,7 +1,7 @@
 import { AppError } from './config.js';
 
 const userFields = ['nome', 'filial', 'filial_nome', 'filial_estado', 'filial_cidade', 'filial_regional', 'documento', 'cargo', 'responsavel'];
-const saleFields = ['filial_cnpj', 'pedido_id', 'nota_numero', 'pedido_data_venda', 'vendedor', 'produto_id', 'produto_ean', 'produto_qtd', 'produto_valor', 'produto_desconto'];
+const saleFields = ['filial_cnpj', 'pedido_id', 'nota_numero', 'pedido_data_venda', 'vendedor', 'produto_id', 'produto_ean', 'produto_descricao', 'produto_qtd', 'produto_valor', 'produto_desconto', 'fornecedor_cnpj', 'fornecedor_razao', 'fornecedor_fantasia'];
 const numericFields = new Set(['produto_qtd', 'produto_valor', 'produto_desconto']);
 const invalid = (message) => { throw new AppError(422, 'DATA_INVALID', message); };
 
@@ -29,7 +29,10 @@ export function normalizeRows(dataset, rows, maxRows) {
     const lower = Object.fromEntries(Object.entries(input).map(([k, v]) => [k.toLowerCase(), v]));
     const row = {};
     for (const field of dataset === 'usuarios' ? userFields : saleFields) {
-      const value = lower[field];
+      const value = dataset === 'vendas' && field === 'nota_numero' &&
+        (lower[field] === null || lower[field] === undefined || String(lower[field]).trim() === '')
+        ? '0'
+        : lower[field];
       if (field === 'responsavel' && value === null) { row[field] = null; continue; }
       if (numericFields.has(field)) {
         if (typeof value !== 'number' || !Number.isFinite(value)) invalid(`Registro ${index}: ${field} deve ser numero.`);
@@ -42,7 +45,7 @@ export function normalizeRows(dataset, rows, maxRows) {
     for (const field of ['documento', 'responsavel', 'vendedor']) {
       if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 11, field);
     }
-    for (const field of ['filial', 'filial_cnpj']) {
+    for (const field of ['filial', 'filial_cnpj', 'fornecedor_cnpj']) {
       if (row[field] !== undefined) row[field] = documentMask(row[field], 14, field);
     }
     if (dataset === 'vendas' && !validDate(row.pedido_data_venda)) invalid(`Registro ${index}: data da venda invalida.`);
