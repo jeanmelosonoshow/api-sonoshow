@@ -12,12 +12,37 @@ export function readSql(dataset) {
   return sql;
 }
 
-export function prepareQuery(dataset, sql, window) {
+export function readSupplierIds() {
+  let config;
+  try {
+    config = JSON.parse(readFileSync(new URL('../config/sales-filter.json', import.meta.url), 'utf8'));
+  } catch {
+    throw new AppError(503, 'FILTER_CONFIG_INVALID', 'Nao foi possivel ler config/sales-filter.json.');
+  }
+  if (!config || !Array.isArray(config.supplierIds) || config.supplierIds.length > 1000 ||
+      config.supplierIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+    throw new AppError(503, 'FILTER_CONFIG_INVALID', 'supplierIds deve ser uma lista de inteiros positivos.');
+  }
+  return [...new Set(config.supplierIds)];
+}
+
+export function prepareQuery(dataset, sql, window, supplierIds = dataset === 'vendas' ? readSupplierIds() : []) {
   if (dataset !== 'vendas') return { sql, params: [] };
   if (!sql.includes(':date_start') || !sql.includes(':date_end_exclusive')) {
     throw new AppError(503, 'SQL_WINDOW_REQUIRED', 'SELECT de vendas deve filtrar por :date_start e :date_end_exclusive.');
   }
-  return { sql, params: { date_start: window.start, date_end_exclusive: window.endExclusive } };
+  const marker = '/* SUPPLIER_FILTER */';
+  if (!sql.includes(marker)) {
+    throw new AppError(503, 'SQL_FILTER_REQUIRED', `SELECT de vendas deve conter o marcador ${marker}.`);
+  }
+  const params = { date_start: window.start, date_end_exclusive: window.endExclusive };
+  const placeholders = supplierIds.map((id, index) => {
+    const name = `supplier_id_${index}`;
+    params[name] = id;
+    return `:${name}`;
+  });
+  const clause = placeholders.length ? `AND FO.IDFORNECEDOR IN (${placeholders.join(', ')})` : '';
+  return { sql: sql.replace(marker, clause), params };
 }
 
 export function createFirebirdReader(config, env = process.env) {

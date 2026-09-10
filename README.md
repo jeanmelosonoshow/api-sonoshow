@@ -90,6 +90,10 @@ Aliases de vendas: `filial_cnpj`, `pedido_id`, `nota_numero`, `pedido_data_venda
 
 Quando a nota fiscal ainda não tiver sido emitida, `nota_numero` será enviado como texto com valor `"0"`.
 
+O filtro de fornecedores fica em `config/sales-filter.json`. Preencha `supplierIds` com os IDs permitidos; uma lista vazia desativa a restricao. O filtro e inserido de forma parametrizada no marcador `/* SUPPLIER_FILTER */` do SELECT de vendas.
+
+`fornecedor_cnpj` sera `null` quando o fornecedor nao tiver CNPJ cadastrado.
+
 - Aliases em maiusculas tambem sao aceitos.
 - CPF/CNPJ e identificadores devem vir como texto, preservando zeros iniciais. CPF/CNPJ podem vir com ou sem pontuacao; a API aplica a mascara. A validacao de formato nao verifica digitos verificadores.
 - `responsavel` e obrigatorio e pode ser `NULL` no topo da hierarquia.

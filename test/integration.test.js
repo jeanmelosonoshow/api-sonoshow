@@ -196,6 +196,15 @@ test('venda sem numero de nota usa zero enquanto a nota fiscal nao foi emitida',
   });
 });
 
+test('venda sem CNPJ cadastrado para o fornecedor preserva o campo como nulo', async () => {
+  const withoutSupplierDocument = { ...sale('001', '2026-09-01 10:00:00'), fornecedor_cnpj: null };
+  await withApi({ cache: { read: async () => ({ ...snapshot(), vendas: [withoutSupplierDocument] }) } }, async call => {
+    const result = await call('/vendas', { method: 'POST', body: { produtos: ['001'] } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.vendas[0].fornecedor_cnpj, null);
+  });
+});
+
 test('rota Vercel preserva filtros mesmo com URL reescrita e body ja interpretado', async () => {
   const handler = createHandler({ config: testConfig(), env, now: () => testNow, route: '/vendas', cache: { read: async () => snapshot() } });
   let response;

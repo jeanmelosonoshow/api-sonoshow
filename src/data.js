@@ -34,6 +34,11 @@ export function normalizeRows(dataset, rows, maxRows) {
         ? '0'
         : lower[field];
       if (field === 'responsavel' && value === null) { row[field] = null; continue; }
+      if (field === 'fornecedor_cnpj' &&
+          (value === null || value === undefined || String(value).trim() === '')) {
+        row[field] = null;
+        continue;
+      }
       if (numericFields.has(field)) {
         if (typeof value !== 'number' || !Number.isFinite(value)) invalid(`Registro ${index}: ${field} deve ser numero.`);
         row[field] = value;
@@ -46,7 +51,7 @@ export function normalizeRows(dataset, rows, maxRows) {
       if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 11, field);
     }
     for (const field of ['filial', 'filial_cnpj', 'fornecedor_cnpj']) {
-      if (row[field] !== undefined) row[field] = documentMask(row[field], 14, field);
+      if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 14, field);
     }
     if (dataset === 'vendas' && !validDate(row.pedido_data_venda)) invalid(`Registro ${index}: data da venda invalida.`);
     return row;

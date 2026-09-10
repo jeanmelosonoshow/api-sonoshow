@@ -31,6 +31,7 @@ WITH VENDAS AS (
      AND L.STATUS = 'A'
     WHERE S.STATUS = 'A'
       AND S.TIPOSAIDA IN ('1', '2', '9')
+      /* SUPPLIER_FILTER */
       AND S.DATASAIDA >= CAST(:date_start AS TIMESTAMP)
       AND S.DATASAIDA < CAST(:date_end_exclusive AS TIMESTAMP)
       AND NOT (I.QTDE - COALESCE(I.QTDEDEVOLVIDA, 0)) = 0

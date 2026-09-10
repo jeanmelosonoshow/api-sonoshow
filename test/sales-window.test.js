@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig, validateConfig } from '../src/config.js';
 import { salesWindow, withinWindow, intersectFilters, directQueryWindow, defaultDirectStart, assertDirectStart, assertSnapshotWindow, assertCoverage } from '../src/sales-window.js';
-import { prepareQuery, createFirebirdReader } from '../src/firebird.js';
+import { prepareQuery, createFirebirdReader, readSupplierIds } from '../src/firebird.js';
 
 const config = (initialDate, mode = 2) => ({ ...loadConfig(), mode, sales: { initialDate, lookbackDays: 90, timeZone: 'America/Sao_Paulo' } });
 const now = new Date('2026-09-08T15:00:00Z');
@@ -79,12 +79,17 @@ test('data inicial ausente, datas invalidas e fuso errado falham explicitamente'
 });
 
 test('consulta Firebird recebe limites como parametros sem interpolar SQL', () => {
-  const sql = 'SELECT * FROM VENDAS WHERE DATA >= CAST(:date_start AS TIMESTAMP) AND DATA < CAST(:date_end_exclusive AS TIMESTAMP)';
+  const sql = 'SELECT * FROM VENDAS V JOIN FORNECEDOR FO ON 1 = 1 WHERE /* SUPPLIER_FILTER */ DATA >= CAST(:date_start AS TIMESTAMP) AND DATA < CAST(:date_end_exclusive AS TIMESTAMP)';
   const window = salesWindow(config('2026-09-01'), now);
-  const query = prepareQuery('vendas', sql, window);
-  assert.equal(query.sql, sql);
-  assert.deepEqual(query.params, { date_start: '2026-09-01 00:00:00', date_end_exclusive: '2026-09-09 00:00:00' });
+  const query = prepareQuery('vendas', sql, window, [473, 587, 598]);
+  assert.match(query.sql, /AND FO\.IDFORNECEDOR IN \(:supplier_id_0, :supplier_id_1, :supplier_id_2\)/);
+  assert.deepEqual(query.params, { date_start: '2026-09-01 00:00:00', date_end_exclusive: '2026-09-09 00:00:00',
+    supplier_id_0: 473, supplier_id_1: 587, supplier_id_2: 598 });
+  const unrestricted = prepareQuery('vendas', sql, window, []);
+  assert.ok(!unrestricted.sql.includes('SUPPLIER_FILTER'));
+  assert.ok(!unrestricted.sql.includes('IDFORNECEDOR IN'));
   assert.throws(() => prepareQuery('vendas', 'SELECT * FROM VENDAS', window), error => error.code === 'SQL_WINDOW_REQUIRED');
+  assert.deepEqual(readSupplierIds(), [473, 587, 598]);
   assert.deepEqual(prepareQuery('usuarios', 'SELECT * FROM USUARIOS'), { sql: 'SELECT * FROM USUARIOS', params: [] });
 });
 
