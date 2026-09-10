@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Documentação da API de integração da SonoShow Móveis para consulta de usuários e vendas.">
+  <meta name="theme-color" content="#211f49">
+  <title>API de Integração | SonoShow Móveis</title>
+  <style>
+    :root {
+      --navy: #211f49;
+      --navy-2: #312e5d;
+      --navy-3: #17162f;
+      --gold: #ffb40c;
+      --gold-soft: #fff3cf;
+      --ink: #20202a;
+      --muted: #656577;
+      --line: #e6e5ed;
+      --surface: #ffffff;
+      --surface-soft: #f7f7fa;
+      --green: #18794e;
+      --green-soft: #e8f7ef;
+      --blue: #2369bd;
+      --shadow: 0 18px 45px rgba(33, 31, 73, .1);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--surface-soft);
+      font-family: Inter, Fabriga, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    :focus-visible { outline: 3px solid rgba(255, 180, 12, .6); outline-offset: 3px; }
+
+    .topbar {
+      height: 6px;
+      background: linear-gradient(90deg, var(--gold), #e0a61c 55%, var(--navy) 55%);
+    }
+    .shell { min-height: calc(100vh - 6px); display: grid; grid-template-columns: 288px minmax(0, 1fr); }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 30px 24px;
+      color: #fff;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(255, 180, 12, .14), transparent 28%),
+        linear-gradient(160deg, var(--navy-2), var(--navy-3));
+      overflow-y: auto;
+    }
+    .brand { display: flex; align-items: center; gap: 13px; padding-bottom: 26px; border-bottom: 1px solid rgba(255,255,255,.14); }
+    .brand img { display: block; width: 142px; height: auto; filter: drop-shadow(0 5px 12px rgba(0,0,0,.22)); }
+    .brand small { display: block; color: rgba(255,255,255,.65); font-size: .74rem; line-height: 1.3; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-label { margin: 28px 12px 10px; color: rgba(255,255,255,.5); font-size: .74rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; }
+    .nav a { padding: 9px 12px; border-radius: 9px; color: rgba(255,255,255,.78); text-decoration: none; font-size: .93rem; font-weight: 650; }
+    .nav a:hover, .nav a.active { color: #fff; background: rgba(255,255,255,.1); }
+    .nav a.active { box-shadow: inset 3px 0 0 var(--gold); }
+    .sidebar-contact { margin-top: 30px; padding: 17px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.06); }
+    .sidebar-contact strong { display: block; color: var(--gold); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+    .sidebar-contact p { margin: 7px 0 10px; color: rgba(255,255,255,.72); font-size: .86rem; line-height: 1.5; }
+    .sidebar-contact a { color: #fff; font-size: .82rem; overflow-wrap: anywhere; }
+
+    main { min-width: 0; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 58px clamp(28px, 6vw, 86px) 54px;
+      color: #fff;
+      background: var(--navy);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 380px;
+      height: 380px;
+      right: -120px;
+      top: -180px;
+      border: 64px solid rgba(255,180,12,.14);
+      border-radius: 50%;
+    }
+    .hero-inner { position: relative; z-index: 1; max-width: 920px; }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; margin-bottom: 16px; color: var(--gold); font-size: .82rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .eyebrow::before { content: ""; width: 26px; height: 3px; border-radius: 9px; background: var(--gold); }
+    h1 { max-width: 780px; margin: 0; font-size: clamp(2.35rem, 6vw, 4.65rem); line-height: .98; letter-spacing: -.055em; }
+    .hero p { max-width: 710px; margin: 23px 0 30px; color: rgba(255,255,255,.74); font-size: 1.08rem; }
+    .base-url { display: flex; align-items: center; gap: 12px; max-width: 700px; padding: 10px 10px 10px 17px; border: 1px solid rgba(255,255,255,.17); border-radius: 13px; background: rgba(0,0,0,.17); }
+    .base-url span { flex: 1; min-width: 0; color: #fff; font-family: Consolas, monospace; font-size: .9rem; overflow-wrap: anywhere; }
+
+    .copy-button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 0; border-radius: 8px; color: var(--navy); background: var(--gold); cursor: pointer; font-size: .8rem; font-weight: 800; }
+    .copy-button:hover { background: #ffc13d; }
+    .copy-button svg { width: 15px; height: 15px; }
+
+    .content { max-width: 1120px; margin: 0 auto; padding: 52px clamp(22px, 5vw, 72px) 90px; }
+    section { scroll-margin-top: 28px; margin-bottom: 70px; }
+    .section-kicker { margin: 0 0 8px; color: var(--gold); font-size: .78rem; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { margin: 0 0 13px; color: var(--navy); font-size: clamp(1.75rem, 3vw, 2.35rem); line-height: 1.15; letter-spacing: -.035em; }
+    h3 { margin: 0; color: var(--navy); font-size: 1.16rem; line-height: 1.35; }
+    .lead { max-width: 760px; margin: 0 0 28px; color: var(--muted); }
+
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .step { position: relative; min-height: 180px; padding: 25px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 8px 24px rgba(33,31,73,.05); }
+    .step-number { display: grid; place-items: center; width: 35px; height: 35px; margin-bottom: 22px; border-radius: 50%; color: var(--navy); background: var(--gold); font-size: .86rem; font-weight: 900; }
+    .step p { margin: 8px 0 0; color: var(--muted); font-size: .93rem; }
+    .step a { color: var(--navy-2); font-weight: 750; }
+
+    .callout { display: grid; grid-template-columns: auto 1fr; gap: 18px; padding: 24px; border: 1px solid #f0d889; border-radius: var(--radius); background: var(--gold-soft); }
+    .callout-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 12px; color: var(--navy); background: var(--gold); }
+    .callout-icon svg { width: 22px; height: 22px; }
+    .callout p { margin: 5px 0 0; color: #5f552f; }
+    .callout a { color: var(--navy); font-weight: 800; }
+
+    .auth-example { margin-top: 18px; }
+    .endpoint { margin-bottom: 32px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+    .endpoint-head { display: flex; align-items: center; gap: 14px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+    .method { display: inline-flex; justify-content: center; min-width: 64px; padding: 6px 10px; border-radius: 8px; font-family: Consolas, monospace; font-size: .78rem; font-weight: 900; letter-spacing: .05em; }
+    .method.get { color: var(--green); background: var(--green-soft); }
+    .method.post { color: #fff; background: var(--blue); }
+    .route { color: var(--navy); font-family: Consolas, monospace; font-size: 1rem; font-weight: 800; }
+    .endpoint-summary { margin-left: auto; color: var(--muted); font-size: .86rem; }
+    .endpoint-body { padding: 28px 24px 31px; }
+    .endpoint-body > p:first-child { margin-top: 0; }
+
+    .subsection { margin-top: 28px; }
+    .subsection h3 { margin-bottom: 12px; }
+    .code-wrap { position: relative; border-radius: 14px; background: #171725; overflow: hidden; }
+    .code-label { padding: 9px 14px; color: #a9a8bb; border-bottom: 1px solid rgba(255,255,255,.08); background: #20202f; font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .code-wrap .copy-button { position: absolute; top: 7px; right: 8px; padding: 6px 9px; }
+    pre { margin: 0; padding: 21px; color: #eeedf5; overflow: auto; font-size: .86rem; line-height: 1.68; tab-size: 2; }
+    .code-key { color: #ffd270; }
+    .code-value { color: #9bd8b6; }
+    .code-comment { color: #8f8ea4; }
+
+    .table-wrap { border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: .9rem; }
+    th, td { padding: 13px 15px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--navy); background: #f0eff6; font-size: .77rem; letter-spacing: .04em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td code { color: var(--navy-2); font-size: .84rem; font-weight: 750; }
+    .required { color: #9b2c2c; font-size: .75rem; font-weight: 800; }
+    .optional { color: var(--muted); font-size: .75rem; font-weight: 700; }
+
+    .note { margin: 18px 0; padding: 16px 18px; border-left: 4px solid var(--gold); border-radius: 0 10px 10px 0; color: #545365; background: #f7f4e9; }
+    .note strong { color: var(--navy); }
+    .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .status-item { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .status-item code { display: inline-block; margin-bottom: 6px; color: var(--navy); font-weight: 900; }
+    .status-item p { margin: 0; color: var(--muted); font-size: .9rem; }
+
+    .footer { padding: 38px clamp(22px, 5vw, 72px); color: rgba(255,255,255,.65); background: var(--navy-3); font-size: .87rem; }
+    .footer-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; max-width: 1120px; margin: 0 auto; }
+    .footer strong { color: #fff; }
+    .footer a { color: var(--gold); }
+
+    .mobile-nav { display: none; }
+    .toast { position: fixed; z-index: 10; right: 24px; bottom: 24px; padding: 11px 15px; border-radius: 10px; color: #fff; background: var(--green); box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; font-size: .86rem; font-weight: 750; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 920px) {
+      .shell { display: block; }
+      .sidebar { display: none; }
+      .mobile-nav { position: sticky; z-index: 5; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 18px; color: #fff; background: var(--navy-3); box-shadow: 0 4px 18px rgba(0,0,0,.16); }
+      .mobile-nav img { width: 112px; height: auto; }
+      .mobile-nav a { color: var(--gold); font-size: .84rem; font-weight: 800; text-decoration: none; }
+      .hero { padding-top: 52px; }
+      .steps { grid-template-columns: 1fr; }
+      .step { min-height: 0; }
+    }
+    @media (max-width: 620px) {
+      body { font-size: 16px; }
+      .hero { padding: 42px 21px 40px; }
+      .hero p { font-size: 1rem; }
+      .base-url { align-items: stretch; flex-direction: column; }
+      .base-url .copy-button { justify-content: center; }
+      .content { padding: 42px 18px 72px; }
+      section { margin-bottom: 56px; }
+      .callout { grid-template-columns: 1fr; }
+      .endpoint-head { align-items: flex-start; flex-wrap: wrap; }
+      .endpoint-summary { width: 100%; margin-left: 0; }
+      .endpoint-body { padding: 24px 18px 26px; }
+      .status-grid { grid-template-columns: 1fr; }
+      .footer-inner { align-items: flex-start; flex-direction: column; }
+      pre { font-size: .79rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="topbar"></div>
+  <div class="mobile-nav">
+    <img src="assets/sonoshow-logo.webp" alt="SonoShow Móveis">
+    <a href="#inicio">Documentação API</a>
+  </div>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Navegação da documentação">
+      <div class="brand">
+        <img src="assets/sonoshow-logo.webp" alt="SonoShow Móveis">
+        <small>Integração<br>de dados</small>
+      </div>
+      <p class="nav-label">Começar</p>
+      <nav class="nav">
+        <a href="#inicio" class="active">Visão geral</a>
+        <a href="#primeiros-passos">Primeiros passos</a>
+        <a href="#autenticacao">Autenticação</a>
+      </nav>
+      <p class="nav-label">Endpoints</p>
+      <nav class="nav">
+        <a href="#usuarios">GET /usuarios</a>
+        <a href="#vendas">POST /vendas</a>
+        <a href="#status">GET /health</a>
+      </nav>
+      <p class="nav-label">Referência</p>
+      <nav class="nav">
+        <a href="#erros">Erros</a>
+        <a href="#boas-praticas">Boas práticas</a>
+      </nav>
+      <div class="sidebar-contact">
+        <strong>Acesso</strong>
+        <p>Solicite seu Bearer Token ao administrador da integração.</p>
+        <a href="mailto:jean.melo@sonoshow.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20acesso%20%C3%A0%20API%20SonoShow">jean.melo@sonoshow.com.br</a>
+      </div>
+    </aside>
+
+    <main id="inicio">
+      <header class="hero">
+        <div class="hero-inner">
+          <div class="eyebrow">Documentação oficial</div>
+          <h1>API de integração SonoShow</h1>
+          <p>Consulte a estrutura de usuários e as vendas disponibilizadas para integração com sistemas autorizados. Todas as respostas usam JSON e o acesso é protegido por token.</p>
+          <div class="base-url" aria-label="URL base da API">
+            <span id="base-url">https://sua-api.vercel.app</span>
+            <button class="copy-button" type="button" data-copy-target="base-url" aria-label="Copiar URL base">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copiar
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section id="primeiros-passos">
+          <p class="section-kicker">Fluxo de uso</p>
+          <h2>Comece em três etapas</h2>
+          <p class="lead">A integração usa HTTP sobre HTTPS, autenticação Bearer e conteúdo JSON. Não é necessário instalar um SDK específico.</p>
+          <div class="steps">
+            <article class="step"><div class="step-number">1</div><h3>Solicite o token</h3><p>Envie a solicitação ao <a href="mailto:jean.melo@sonoshow.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20acesso%20%C3%A0%20API%20SonoShow">administrador</a> e informe qual sistema consumirá a API.</p></article>
+            <article class="step"><div class="step-number">2</div><h3>Envie o cabeçalho</h3><p>Inclua <code>Authorization: Bearer SEU_TOKEN</code> em todas as requisições.</p></article>
+            <article class="step"><div class="step-number">3</div><h3>Consuma os dados</h3><p>Consulte usuários por GET e filtre vendas por período e códigos de produto.</p></article>
+          </div>
+        </section>
+
+        <section id="autenticacao">
+          <p class="section-kicker">Segurança</p>
+          <h2>Autenticação</h2>
+          <p class="lead">A API usa um Bearer Token individual, enviado no cabeçalho HTTP. Trate esse token como uma senha e mantenha-o somente no servidor que fará a integração.</p>
+          <div class="callout">
+            <div class="callout-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+            <div><h3>Como obter acesso</h3><p>Solicite o token ao administrador Jean Melo pelo e-mail <a href="mailto:jean.melo@sonoshow.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20acesso%20%C3%A0%20API%20SonoShow">jean.melo@sonoshow.com.br</a>. Informe a empresa, o sistema consumidor e o responsável técnico.</p></div>
+          </div>
+          <div class="auth-example code-wrap">
+            <div class="code-label">Cabeçalho obrigatório</div>
+            <button class="copy-button" type="button" data-copy-code aria-label="Copiar cabeçalho">Copiar</button>
+            <pre><code>Authorization: Bearer SEU_TOKEN_DE_ACESSO</code></pre>
+          </div>
+          <div class="note"><strong>Nunca envie o token na URL.</strong> Não publique o valor em repositórios, logs, código executado no navegador ou mensagens sem proteção.</div>
+        </section>
+
+        <section id="usuarios">
+          <p class="section-kicker">Estrutura organizacional</p>
+          <h2>Usuários</h2>
+          <article class="endpoint">
+            <div class="endpoint-head"><span class="method get">GET</span><span class="route">/usuarios</span><span class="endpoint-summary">Retorna todos os usuários disponíveis</span></div>
+            <div class="endpoint-body">
+              <p>Use este endpoint para obter diretores, supervisores, gerentes e vendedores, incluindo sua filial e relação de responsabilidade.</p>
+              <div class="subsection"><h3>Exemplo de requisição</h3><div class="code-wrap"><div class="code-label">cURL</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>curl --request GET \
+  --url '<span data-base>https://sua-api.vercel.app</span>/usuarios' \
+  --header 'Authorization: Bearer SEU_TOKEN_DE_ACESSO'</code></pre></div></div>
+              <div class="subsection"><h3>Resposta de sucesso</h3><div class="code-wrap"><div class="code-label">HTTP 200 · application/json</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>{
+  <span class="code-key">"usuarios"</span>: [
+    {
+      <span class="code-key">"nome"</span>: <span class="code-value">"Maria da Silva"</span>,
+      <span class="code-key">"filial"</span>: <span class="code-value">"05.507.218/0001-50"</span>,
+      <span class="code-key">"filial_nome"</span>: <span class="code-value">"MATRIZ"</span>,
+      <span class="code-key">"filial_estado"</span>: <span class="code-value">"RJ"</span>,
+      <span class="code-key">"filial_cidade"</span>: <span class="code-value">"RIO DE JANEIRO"</span>,
+      <span class="code-key">"filial_regional"</span>: <span class="code-value">"GERAL"</span>,
+      <span class="code-key">"documento"</span>: <span class="code-value">"123.456.789-00"</span>,
+      <span class="code-key">"cargo"</span>: <span class="code-value">"DIRETORIA"</span>,
+      <span class="code-key">"responsavel"</span>: null
+    }
+  ]
+}</code></pre></div></div>
+              <div class="subsection"><h3>Campos retornados</h3><div class="table-wrap"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>
+                <tr><td><code>nome</code></td><td>texto</td><td>Nome do usuário.</td></tr>
+                <tr><td><code>filial</code></td><td>texto</td><td>CNPJ formatado da filial.</td></tr>
+                <tr><td><code>filial_nome</code></td><td>texto</td><td>Nome da filial.</td></tr>
+                <tr><td><code>filial_estado</code></td><td>texto</td><td>UF da filial.</td></tr>
+                <tr><td><code>filial_cidade</code></td><td>texto</td><td>Cidade da filial.</td></tr>
+                <tr><td><code>filial_regional</code></td><td>texto</td><td>Regional associada ao usuário.</td></tr>
+                <tr><td><code>documento</code></td><td>texto</td><td>CPF formatado do usuário.</td></tr>
+                <tr><td><code>cargo</code></td><td>texto</td><td>Cargo na estrutura comercial.</td></tr>
+                <tr><td><code>responsavel</code></td><td>texto ou nulo</td><td>CPF formatado do responsável imediato; nulo no nível superior.</td></tr>
+              </tbody></table></div></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="vendas">
+          <p class="section-kicker">Movimento comercial</p>
+          <h2>Vendas</h2>
+          <article class="endpoint">
+            <div class="endpoint-head"><span class="method post">POST</span><span class="route">/vendas</span><span class="endpoint-summary">Filtra vendas por produtos e período</span></div>
+            <div class="endpoint-body">
+              <p>Envie os códigos dos produtos no corpo da requisição. O período pode ser informado na URL para restringir o conjunto retornado.</p>
+              <div class="subsection"><h3>Parâmetros da URL</h3><div class="table-wrap"><table><thead><tr><th>Parâmetro</th><th>Obrigatoriedade</th><th>Formato</th><th>Descrição</th></tr></thead><tbody>
+                <tr><td><code>date_start</code></td><td><span class="optional">Opcional</span></td><td><code>YYYY-MM-DD HH:MM:SS</code></td><td>Início inclusivo do período. Deve respeitar a data inicial disponibilizada.</td></tr>
+                <tr><td><code>date_end</code></td><td><span class="optional">Opcional</span></td><td><code>YYYY-MM-DD HH:MM:SS</code></td><td>Fim inclusivo do período.</td></tr>
+              </tbody></table></div></div>
+              <div class="note"><strong>Codifique o espaço da data como <code>%20</code>.</strong> Exemplo: <code>2026-09-01%2000:00:00</code>. Se o início não for informado, a consulta considera somente o dia atual quando a fonte direta estiver ativa.</div>
+              <div class="subsection"><h3>Corpo da requisição</h3><div class="code-wrap"><div class="code-label">JSON obrigatório</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>{
+  <span class="code-key">"produtos"</span>: [<span class="code-value">"001"</span>, <span class="code-value">"002"</span>]
+}</code></pre></div></div>
+              <p class="note"><strong>Os códigos devem ser textos.</strong> É possível enviar até 2.000 produtos por requisição. Uma lista vazia retorna <code>{ "vendas": [] }</code>.</p>
+              <div class="subsection"><h3>Exemplo completo</h3><div class="code-wrap"><div class="code-label">cURL</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>curl --request POST \
+  --url '<span data-base>https://sua-api.vercel.app</span>/vendas?date_start=2026-09-01%2000:00:00&amp;date_end=2026-09-30%2023:59:59' \
+  --header 'Authorization: Bearer SEU_TOKEN_DE_ACESSO' \
+  --header 'Content-Type: application/json' \
+  --data '{"produtos":["001","002"]}'</code></pre></div></div>
+              <div class="subsection"><h3>Resposta de sucesso</h3><div class="code-wrap"><div class="code-label">HTTP 200 · application/json</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>{
+  <span class="code-key">"vendas"</span>: [
+    {
+      <span class="code-key">"filial_cnpj"</span>: <span class="code-value">"05.507.218/0001-50"</span>,
+      <span class="code-key">"pedido_id"</span>: <span class="code-value">"123456"</span>,
+      <span class="code-key">"nota_numero"</span>: <span class="code-value">"98765"</span>,
+      <span class="code-key">"pedido_data_venda"</span>: <span class="code-value">"2026-09-09 14:35:00"</span>,
+      <span class="code-key">"vendedor"</span>: <span class="code-value">"123.456.789-00"</span>,
+      <span class="code-key">"produto_id"</span>: <span class="code-value">"001"</span>,
+      <span class="code-key">"produto_ean"</span>: <span class="code-value">"7890000000001"</span>,
+      <span class="code-key">"produto_qtd"</span>: 2,
+      <span class="code-key">"produto_valor"</span>: 899.9,
+      <span class="code-key">"produto_desconto"</span>: 50
+    }
+  ]
+}</code></pre></div></div>
+              <div class="subsection"><h3>Campos retornados</h3><div class="table-wrap"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>
+                <tr><td><code>filial_cnpj</code></td><td>texto</td><td>CNPJ formatado da filial.</td></tr>
+                <tr><td><code>pedido_id</code></td><td>texto</td><td>Identificador do pedido.</td></tr>
+                <tr><td><code>nota_numero</code></td><td>texto</td><td>Número da nota fiscal.</td></tr>
+                <tr><td><code>pedido_data_venda</code></td><td>texto</td><td>Data e hora da venda.</td></tr>
+                <tr><td><code>vendedor</code></td><td>texto</td><td>CPF formatado do vendedor.</td></tr>
+                <tr><td><code>produto_id</code></td><td>texto</td><td>Código interno do produto, usado também no filtro.</td></tr>
+                <tr><td><code>produto_ean</code></td><td>texto</td><td>Código EAN do produto.</td></tr>
+                <tr><td><code>produto_qtd</code></td><td>número</td><td>Quantidade vendida.</td></tr>
+                <tr><td><code>produto_valor</code></td><td>número</td><td>Valor unitário do produto.</td></tr>
+                <tr><td><code>produto_desconto</code></td><td>número</td><td>Valor de desconto associado ao item.</td></tr>
+              </tbody></table></div></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="status">
+          <p class="section-kicker">Disponibilidade</p>
+          <h2>Status da API</h2>
+          <article class="endpoint">
+            <div class="endpoint-head"><span class="method get">GET</span><span class="route">/health</span><span class="endpoint-summary">Confirma que o serviço está ativo</span></div>
+            <div class="endpoint-body">
+              <p>Use esta rota para verificar autenticação e disponibilidade básica do processo. Uma resposta positiva não confirma, por si só, a atualização dos dados.</p>
+              <div class="code-wrap"><div class="code-label">cURL</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>curl --request GET \
+  --url '<span data-base>https://sua-api.vercel.app</span>/health' \
+  --header 'Authorization: Bearer SEU_TOKEN_DE_ACESSO'</code></pre></div>
+              <div class="subsection"><div class="code-wrap"><div class="code-label">HTTP 200</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>{
+  <span class="code-key">"status"</span>: <span class="code-value">"ok"</span>,
+  <span class="code-key">"mode"</span>: 2
+}</code></pre></div></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="erros">
+          <p class="section-kicker">Diagnóstico</p>
+          <h2>Respostas de erro</h2>
+          <p class="lead">Erros são retornados em JSON com um código estável e uma mensagem explicativa.</p>
+          <div class="code-wrap"><div class="code-label">Formato</div><button class="copy-button" type="button" data-copy-code>Copiar</button><pre><code>{
+  <span class="code-key">"error"</span>: <span class="code-value">"UNAUTHORIZED"</span>,
+  <span class="code-key">"message"</span>: <span class="code-value">"Token invalido."</span>
+}</code></pre></div>
+          <div class="subsection status-grid">
+            <div class="status-item"><code>400 Bad Request</code><p>JSON, filtro de produtos ou período inválido.</p></div>
+            <div class="status-item"><code>401 Unauthorized</code><p>Token ausente, inválido ou enviado incorretamente.</p></div>
+            <div class="status-item"><code>405 Method Not Allowed</code><p>Método HTTP diferente do definido para a rota.</p></div>
+            <div class="status-item"><code>413 Payload Too Large</code><p>Corpo enviado ou resultado acima do limite permitido.</p></div>
+            <div class="status-item"><code>415 Unsupported Media Type</code><p>Requisição POST sem <code>Content-Type: application/json</code>.</p></div>
+            <div class="status-item"><code>503 Service Unavailable</code><p>Dados temporariamente indisponíveis ou aguardando atualização.</p></div>
+          </div>
+        </section>
+
+        <section id="boas-praticas">
+          <p class="section-kicker">Integração confiável</p>
+          <h2>Boas práticas</h2>
+          <div class="table-wrap"><table><thead><tr><th>Recomendação</th><th>Como aplicar</th></tr></thead><tbody>
+            <tr><td>Proteja o token</td><td>Armazene-o como segredo ou variável de ambiente no servidor consumidor.</td></tr>
+            <tr><td>Use HTTPS</td><td>Faça chamadas somente para a URL oficial fornecida pelo administrador.</td></tr>
+            <tr><td>Envie códigos como texto</td><td>Use <code>"001"</code>, preservando zeros à esquerda.</td></tr>
+            <tr><td>Consulte períodos objetivos</td><td>Informe <code>date_start</code> e <code>date_end</code> para reduzir o volume da resposta.</td></tr>
+            <tr><td>Trate indisponibilidade</td><td>Em erros 503, aguarde antes de tentar novamente e use intervalo progressivo entre tentativas.</td></tr>
+            <tr><td>Não presuma unicidade local</td><td>Ao reprocessar um período, substitua os dados desse período conforme a regra da integração.</td></tr>
+          </tbody></table></div>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <div class="footer-inner"><div><strong>SonoShow Móveis</strong><br>API de integração · documentação para parceiros autorizados</div><div>Dúvidas de acesso: <a href="mailto:jean.melo@sonoshow.com.br?subject=Suporte%20da%20API%20SonoShow">jean.melo@sonoshow.com.br</a></div></div>
+      </footer>
+    </main>
+  </div>
+  <div class="toast" role="status" aria-live="polite">Copiado para a área de transferência</div>
+  <script>
+    (() => {
+      const placeholder = 'https://sua-api.vercel.app';
+      const base = /^https?:$/.test(location.protocol) ? location.origin : placeholder;
+      document.getElementById('base-url').textContent = base;
+      document.querySelectorAll('[data-base]').forEach(el => { el.textContent = base; });
+
+      const toast = document.querySelector('.toast');
+      let toastTimer;
+      const showToast = () => {
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+      };
+      const copy = async text => {
+        try { await navigator.clipboard.writeText(text); }
+        catch {
+          const area = document.createElement('textarea');
+          area.value = text; area.style.position = 'fixed'; area.style.opacity = '0';
+          document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove();
+        }
+        showToast();
+      };
+      document.querySelectorAll('[data-copy-target]').forEach(button => button.addEventListener('click', () => copy(document.getElementById(button.dataset.copyTarget).textContent.trim())));
+      document.querySelectorAll('[data-copy-code]').forEach(button => button.addEventListener('click', () => copy(button.closest('.code-wrap').querySelector('code').innerText.trim())));
+
+      const links = [...document.querySelectorAll('.sidebar .nav a')];
+      const sections = links.map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        links.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + visible.target.id));
+      }, { rootMargin: '-20% 0px -68%', threshold: [0, .25, .6] });
+      sections.forEach(section => observer.observe(section));
+    })();
+  </script>
+</body>
+</html>
