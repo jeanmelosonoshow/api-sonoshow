@@ -27,7 +27,16 @@ try {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body, signal: AbortSignal.timeout(config.limits.requestTimeoutMs + 5000)
     });
-    if (!response.ok) throw new AppError(response.status, 'UPLOAD_FAILED', `Publicacao rejeitada: HTTP ${response.status}. O cache anterior nao foi confirmado como atualizado.`);
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const errorBody = await response.json();
+        const code = typeof errorBody.error === 'string' ? errorBody.error.slice(0, 80) : '';
+        const message = typeof errorBody.message === 'string' ? errorBody.message.slice(0, 300) : '';
+        if (code || message) detail = ` (${[code, message].filter(Boolean).join(': ')})`;
+      } catch {}
+      throw new AppError(response.status, 'UPLOAD_FAILED', `Publicacao rejeitada: HTTP ${response.status}${detail}.`);
+    }
     const result = await response.json();
     if (result.ok !== true || result.extractedAt !== extractedAt) throw new AppError(502, 'UPLOAD_UNCONFIRMED', 'Servidor nao confirmou a extracao enviada.');
   }

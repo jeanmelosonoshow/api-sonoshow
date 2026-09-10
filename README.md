@@ -71,8 +71,8 @@ Nao sobrescreva um `.env` ja configurado. Preencha as variaveis conforme o ambie
 |---|---|---|---|
 | API_BEARER_TOKEN | Sim | Sim | Nao |
 | SYNC_BEARER_TOKEN | Nao | Sim | Sim |
-| UPSTASH_REDIS_REST_URL | Nao | Sim | Nao |
-| UPSTASH_REDIS_REST_TOKEN | Nao | Sim | Nao |
+| UPSTASH_REDIS_REST_URL ou KV_REST_API_URL | Nao | Sim | Nao |
+| UPSTASH_REDIS_REST_TOKEN ou KV_REST_API_TOKEN | Nao | Sim | Nao |
 | INTEGRATION_API_URL | Nao | Nao | Sim |
 | FIREBIRD_HOST, PORT, DATABASE, USER, PASSWORD, ENCODING | Sim | Nao | Sim |
 
@@ -131,7 +131,7 @@ powershell.exe -NoProfile -File "C:\Users\Jean\Documents\Codex\API\api-sonoshow\
 
 O wrapper usa a pasta correta independentemente da pasta inicial da tarefa. Configure, por exemplo, a cada 10 minutos para frescor maximo de 60 minutos, com **nao iniciar nova instancia** quando a anterior estiver em andamento. Nenhuma tarefa foi criada automaticamente. O usuario da tarefa precisa acessar Node.js, `.env` e Firebird. Mantenha o relogio do Windows sincronizado.
 
-O script calcula a janela uma vez no inicio, consulta e valida ambos os conjuntos e envia os limites junto com os dados. Erro em uma consulta ou registro impede o envio inteiro. A publicacao Redis substitui usuarios e vendas atomicamente. Uploads iguais ou mais antigos retornam 409, preservando a extracao mais recente. Cada execucao substitui o conjunto completo: **nao envie somente deltas**. Listas vazias validas limpam o respectivo conjunto.
+O script calcula a janela uma vez no inicio, consulta e valida ambos os conjuntos e envia os limites junto com os dados. Usuarios invalidos e vendas sem CPF utilizavel de vendedor sao ignorados com contagem no log; outros erros de dados interrompem o envio. A publicacao Redis substitui usuarios e vendas atomicamente. Uploads iguais ou mais antigos retornam 409, preservando a extracao mais recente. Cada execucao substitui o conjunto completo: **nao envie somente deltas**. Listas vazias validas limpam o respectivo conjunto.
 
 O snapshot fica retido no Redis por 90 dias (`retentionSeconds`), mas deixa de ser servido pela API apos 1 hora sem atualizacao (`maxAgeSeconds`). A retencao longa preserva o ultimo conjunto para diagnostico e recuperacao; a verificacao de frescor impede que uma falha silenciosa no Windows apresente dados antigos como atuais. O sincronizador deve continuar executando em intervalos menores que `maxAgeSeconds`.
 

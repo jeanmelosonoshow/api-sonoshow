@@ -134,6 +134,16 @@ test('Upstash usa GET e publicacao atomica com retencao de 90 dias, sem expor to
   assert.equal(commands[1][0], 'GET');
 });
 
+test('cache aceita os nomes KV_REST_API fornecidos pela integracao da Vercel', async () => {
+  const settings = { KV_REST_API_URL: 'https://example.upstash.io', KV_REST_API_TOKEN: 'token-kv' };
+  const cache = createCache(loadConfig(), settings, async (url, options) => {
+    assert.equal(url, settings.KV_REST_API_URL);
+    assert.equal(options.headers.Authorization, 'Bearer token-kv');
+    return Response.json({ result: JSON.stringify(snapshot()) });
+  });
+  assert.equal((await cache.read()).schemaVersion, 3);
+});
+
 test('cache vazio, corrompido, expirado e falha HTTP nao viram listas vazias', async () => {
   const settings = { UPSTASH_REDIS_REST_URL: 'https://example.upstash.io', UPSTASH_REDIS_REST_TOKEN: 'test-only' };
   for (const raw of [null, '{', JSON.stringify({ ...snapshot(), extractedAt: '2020-01-01T00:00:00.000Z' })]) {

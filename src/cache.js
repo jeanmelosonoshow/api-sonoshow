@@ -1,4 +1,4 @@
-import { AppError, requiredEnv, secureUrl } from './config.js';
+import { AppError, secureUrl } from './config.js';
 
 // One atomic snapshot prevents readers from observing half of a Windows upload.
 // Refuse older extractions so overlapping scheduled executions cannot roll back data.
@@ -12,10 +12,16 @@ end
 redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
 return 1`;
 
+function cacheEnv(env, primary, alternative) {
+  const value = env[primary]?.trim() || env[alternative]?.trim();
+  if (!value) throw new AppError(503, 'ENV_MISSING', `Configuracao ausente: ${primary} ou ${alternative}.`);
+  return value;
+}
+
 export function createCache(config, env = process.env, fetcher = fetch) {
   async function command(args) {
-    const url = secureUrl(requiredEnv(env, 'UPSTASH_REDIS_REST_URL'));
-    const token = requiredEnv(env, 'UPSTASH_REDIS_REST_TOKEN');
+    const url = secureUrl(cacheEnv(env, 'UPSTASH_REDIS_REST_URL', 'KV_REST_API_URL'));
+    const token = cacheEnv(env, 'UPSTASH_REDIS_REST_TOKEN', 'KV_REST_API_TOKEN');
     try {
       const response = await fetcher(url, {
         method: 'POST', redirect: 'error',
