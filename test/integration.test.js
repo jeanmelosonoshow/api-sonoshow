@@ -16,10 +16,10 @@ function testConfig() {
 }
 
 const env = { API_BEARER_TOKEN: 'r'.repeat(40), SYNC_BEARER_TOKEN: 'w'.repeat(40) };
-const usuario = { NOME: 'Teste', FILIAL: '00111222000133', FILIAL_NOME: 'Loja', FILIAL_ESTADO: 'SP',
-  FILIAL_CIDADE: 'Cidade', FILIAL_REGIONAL: 'Regional', DOCUMENTO: '00100200304', CARGO: 'Gerente', RESPONSAVEL: null };
-const sale = (id, date) => ({ filial_cnpj: '00111222000133', pedido_id: '0001', nota_numero: '0002',
-  pedido_data_venda: date, vendedor: '00100200304', produto_id: id, produto_ean: `0789000000${id}`,
+const usuario = { NOME: 'Teste', FILIAL: '111222000133', FILIAL_NOME: 'Loja', FILIAL_ESTADO: 'SP',
+  FILIAL_CIDADE: 'Cidade', FILIAL_REGIONAL: 'Regional', DOCUMENTO: '100200304', CARGO: 'Gerente', RESPONSAVEL: null };
+const sale = (id, date) => ({ filial_cnpj: '111222000133', pedido_id: '0001', nota_numero: '0002',
+  pedido_data_venda: date, vendedor: '100200304', produto_id: id, produto_ean: `0789000000${id}`,
   produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0 });
 const vendas = [sale('001', '2026-09-01 10:00:00'), sale('002', '2026-09-02 10:00:00'), sale('001', '2026-09-03 10:00:00')];
 const snapshot = () => ({ schemaVersion: 2, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
@@ -155,7 +155,9 @@ test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.throws(() => validateConfig(invalidRetention), /invalida/);
   const usuariosSql = readSql('usuarios');
   assert.match(usuariosSql, /^WITH USR_DIRETORIA AS/i);
-  assert.match(usuariosSql, /WHERE U\.DOCUMENTO IS NOT NULL[\s\S]*TRIM\(CAST\(U\.DOCUMENTO AS VARCHAR\(20\)\)\) <> ''$/i);
+  assert.match(usuariosSql, /WHERE U\.DOCUMENTO IS NOT NULL/i);
+  assert.match(usuariosSql, /TRIM\(CAST\(U\.DOCUMENTO AS VARCHAR\(20\)\)\) <> ''/i);
+  assert.match(usuariosSql, /CHAR_LENGTH\([\s\S]+\) <= 11$/i);
   const vendasSql = readSql('vendas');
   assert.match(vendasSql, /^WITH VENDAS AS/i);
   assert.match(vendasSql, /:date_start/i);

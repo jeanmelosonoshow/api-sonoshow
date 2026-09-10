@@ -12,9 +12,10 @@ export function validDate(value) {
 }
 
 function documentMask(value, size, field) {
-  // Never guess missing leading zeroes from a numeric CPF/CNPJ.
+  // CPF/CNPJ stored in numeric Firebird columns lose their leading zeroes.
   if (typeof value !== 'string' || !/^[\d./-]+$/.test(value)) invalid(`Campo ${field} deve ser texto com CPF/CNPJ.`);
-  const digits = value.replace(/\D/g, '');
+  let digits = value.replace(/\D/g, '');
+  if (/^\d+$/.test(value) && digits.length < size) digits = digits.padStart(size, '0');
   if (digits.length !== size) invalid(`Campo ${field} com tamanho invalido.`);
   return size === 11 ? digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
     : digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
