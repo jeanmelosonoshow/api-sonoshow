@@ -1,7 +1,7 @@
 {
   "mode": 2,
   "sales": {
-    "initialDate": null,
+    "initialDate": "2026-09-01",
     "lookbackDays": 90,
     "timeZone": "America/Sao_Paulo"
   },
