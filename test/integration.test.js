@@ -155,7 +155,7 @@ test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.throws(() => validateConfig(invalidRetention), /invalida/);
   const usuariosSql = readSql('usuarios');
   assert.match(usuariosSql, /^WITH USR_DIRETORIA AS/i);
-  assert.match(usuariosSql, /WHERE U\.DOCUMENTO IS NOT NULL$/i);
+  assert.match(usuariosSql, /WHERE U\.DOCUMENTO IS NOT NULL[\s\S]*TRIM\(CAST\(U\.DOCUMENTO AS VARCHAR\(20\)\)\) <> ''$/i);
   const vendasSql = readSql('vendas');
   assert.match(vendasSql, /^WITH VENDAS AS/i);
   assert.match(vendasSql, /:date_start/i);
@@ -197,6 +197,7 @@ test('tokens ausentes ou iguais nao liberam acesso; erro interno nao vaza detalh
 
 test('vendas ficam bloqueadas sem data inicial e periodo externo retorna vazio sem ler fonte', async () => {
   const pending = loadConfig();
+  pending.sales.initialDate = null;
   await withApi({ config: pending, cache: { read: () => assert.fail('nao deve ler sem data inicial') } }, async call => {
     const result = await call('/vendas', { method: 'POST', body: { produtos: ['001'] } });
     assert.equal(result.status, 503);

@@ -6,7 +6,7 @@ WITH USR_DIRETORIA AS (
         'RJ' filial_estado,
         'RIO DE JANEIRO' filial_cidade,
         'GERAL' filial_regional,
-        F.CPF documento,
+        CAST(F.CPF AS VARCHAR(20)) documento,
         'DIRETORIA' cargo,
         CAST(NULL AS VARCHAR(14)) responsavel
     FROM FUNCIONARIO F
@@ -21,7 +21,7 @@ USR_SUPERVISOR AS (
         'RJ' filial_estado,
         'RIO DE JANEIRO' filial_cidade,
         SUBSTRING(F.NOMEFUNCIONARIO FROM 1 FOR POSITION(' ', F.NOMEFUNCIONARIO, 1)) filial_regional,
-        F.CPF documento,
+        CAST(F.CPF AS VARCHAR(20)) documento,
         'SUPERVISOR' cargo,
         '12447430794' responsavel
     FROM FUNCIONARIO F
@@ -31,14 +31,14 @@ USR_SUPERVISOR AS (
 USR_GERENTE AS (
     SELECT
         F.NOMEFUNCIONARIO nome,
-        FL.CGC filial,
+        CAST(FL.CGC AS VARCHAR(20)) filial,
         FL.NOMEFILIAL filial_nome,
         FL.UF filial_estado,
         FL.CIDADE filial_cidade,
         SUBSTRING(SU.NOMEFUNCIONARIO FROM 1 FOR POSITION(' ', SU.NOMEFUNCIONARIO, 1)) filial_regional,
-        F.CPF documento,
+        CAST(F.CPF AS VARCHAR(20)) documento,
         'GERENTE DE LOJA' cargo,
-        SU.CPF responsavel
+        CAST(SU.CPF AS VARCHAR(20)) responsavel
     FROM FUNCIONARIO F
     JOIN FILIAL FL ON FL.IDFILIAL = F.IDFILIAL
     JOIN FUNCIONARIO SU ON SU.IDFUNCIONARIO = FL.IDSUPERVISOR
@@ -50,14 +50,14 @@ USR_GERENTE AS (
 USR_VENDEDOR AS (
     SELECT
         F.NOMEFUNCIONARIO nome,
-        FL.CGC filial,
+        CAST(FL.CGC AS VARCHAR(20)) filial,
         FL.NOMEFILIAL filial_nome,
         FL.UF filial_estado,
         FL.CIDADE filial_cidade,
         SUBSTRING(SU.NOMEFUNCIONARIO FROM 1 FOR POSITION(' ', SU.NOMEFUNCIONARIO, 1)) filial_regional,
-        COALESCE(F.CPF,V.DOCUMENTO) documento,
+        CAST(COALESCE(F.CPF, V.DOCUMENTO) AS VARCHAR(20)) documento,
         'VENDEDOR' cargo,
-        GR.CPF responsavel
+        CAST(GR.CPF AS VARCHAR(20)) responsavel
     FROM FUNCIONARIO F
     JOIN VENDEDOR V ON V.IDVENDEDOR = F.IDVENDEDOR
     JOIN FILIAL FL ON FL.IDFILIAL = F.IDFILIAL
@@ -142,3 +142,4 @@ SELECT
     U.responsavel
 FROM USUARIOS U
 WHERE U.DOCUMENTO IS NOT NULL
+  AND TRIM(CAST(U.DOCUMENTO AS VARCHAR(20))) <> ''
