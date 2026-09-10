@@ -94,6 +94,8 @@ O filtro de fornecedores fica em `config/sales-filter.json`. Preencha `supplierI
 
 `fornecedor_cnpj` sera `null` quando o fornecedor nao tiver CNPJ cadastrado.
 
+O SELECT prioriza `FUNCIONARIO.CPF` quando ele possui tamanho utilizavel e recorre a `VENDEDOR.DOCUMENTO` caso contrario. Se nenhum dos dois formar um CPF de 11 digitos, a venda e ignorada e contabilizada no log para correcao do cadastro no Firebird.
+
 - Aliases em maiusculas tambem sao aceitos.
 - CPF/CNPJ e identificadores devem vir como texto, preservando zeros iniciais. CPF/CNPJ podem vir com ou sem pontuacao; a API aplica a mascara. A validacao de formato nao verifica digitos verificadores.
 - `responsavel` e obrigatorio e pode ser `NULL` no topo da hierarquia.

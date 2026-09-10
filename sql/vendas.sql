@@ -5,7 +5,11 @@ WITH VENDAS AS (
         CAST(S.NUMEROSAIDA AS VARCHAR(50)) pedido_id,
         COALESCE(NULLIF(TRIM(CAST(L.NUMERONF AS VARCHAR(50))), ''), '0') nota_numero,
         SUBSTRING(CAST(S.DATASAIDA AS VARCHAR(24)) FROM 1 FOR 19) pedido_data_venda,
-        CAST(COALESCE(V.CPF, VE.DOCUMENTO) AS VARCHAR(20)) vendedor,
+        CASE
+          WHEN CHAR_LENGTH(REPLACE(REPLACE(REPLACE(TRIM(CAST(V.CPF AS VARCHAR(20))), '.', ''), '-', ''), '/', '')) BETWEEN 1 AND 11
+            THEN CAST(V.CPF AS VARCHAR(20))
+          ELSE CAST(VE.DOCUMENTO AS VARCHAR(20))
+        END vendedor,
         CAST(I.IDPRODUTO AS VARCHAR(50)) produto_id,
         CAST(P.EAN AS VARCHAR(50)) produto_ean,
         I.QTDE produto_qtd,

@@ -24,38 +24,50 @@ function documentMask(value, size, field) {
 export function normalizeRows(dataset, rows, maxRows) {
   if (!['usuarios', 'vendas'].includes(dataset) || !Array.isArray(rows)) invalid('Conjunto de dados invalido.');
   if (rows.length > maxRows) throw new AppError(413, 'TOO_MANY_ROWS', 'Conjunto excede o limite de registros.');
-  return rows.map((input, index) => {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(`Registro ${index} invalido.`);
-    const lower = Object.fromEntries(Object.entries(input).map(([k, v]) => [k.toLowerCase(), v]));
-    const row = {};
-    for (const field of dataset === 'usuarios' ? userFields : saleFields) {
-      const value = dataset === 'vendas' && field === 'nota_numero' &&
-        (lower[field] === null || lower[field] === undefined || String(lower[field]).trim() === '')
-        ? '0'
-        : lower[field];
-      if (field === 'responsavel' && value === null) { row[field] = null; continue; }
-      if (field === 'fornecedor_cnpj' &&
-          (value === null || value === undefined || String(value).trim() === '')) {
-        row[field] = null;
-        continue;
+  let skippedSeller = 0;
+  const normalized = rows.map((input, index) => {
+    try {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(`Registro ${index} invalido.`);
+      const lower = Object.fromEntries(Object.entries(input).map(([k, v]) => [k.toLowerCase(), v]));
+      const row = {};
+      for (const field of dataset === 'usuarios' ? userFields : saleFields) {
+        const value = dataset === 'vendas' && field === 'nota_numero' &&
+          (lower[field] === null || lower[field] === undefined || String(lower[field]).trim() === '')
+          ? '0'
+          : lower[field];
+        if (field === 'responsavel' && value === null) { row[field] = null; continue; }
+        if (field === 'fornecedor_cnpj' &&
+            (value === null || value === undefined || String(value).trim() === '')) {
+          row[field] = null;
+          continue;
+        }
+        if (numericFields.has(field)) {
+          if (typeof value !== 'number' || !Number.isFinite(value)) invalid(`Registro ${index}: ${field} deve ser numero.`);
+          row[field] = value;
+        } else {
+          if (typeof value !== 'string' || !value.trim()) invalid(`Registro ${index}: ${field} deve ser texto preenchido.`);
+          row[field] = value.trim();
+        }
       }
-      if (numericFields.has(field)) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) invalid(`Registro ${index}: ${field} deve ser numero.`);
-        row[field] = value;
-      } else {
-        if (typeof value !== 'string' || !value.trim()) invalid(`Registro ${index}: ${field} deve ser texto preenchido.`);
-        row[field] = value.trim();
+      for (const field of ['documento', 'responsavel', 'vendedor']) {
+        if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 11, field);
       }
+      for (const field of ['filial', 'filial_cnpj', 'fornecedor_cnpj']) {
+        if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 14, field);
+      }
+      if (dataset === 'vendas' && !validDate(row.pedido_data_venda)) invalid(`Registro ${index}: data da venda invalida.`);
+      return row;
+    } catch (error) {
+      if (dataset === 'vendas' && error instanceof AppError && error.code === 'DATA_INVALID' &&
+          error.message.includes('vendedor')) {
+        skippedSeller++;
+        return null;
+      }
+      throw error;
     }
-    for (const field of ['documento', 'responsavel', 'vendedor']) {
-      if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 11, field);
-    }
-    for (const field of ['filial', 'filial_cnpj', 'fornecedor_cnpj']) {
-      if (row[field] !== undefined && row[field] !== null) row[field] = documentMask(row[field], 14, field);
-    }
-    if (dataset === 'vendas' && !validDate(row.pedido_data_venda)) invalid(`Registro ${index}: data da venda invalida.`);
-    return row;
   });
+  if (skippedSeller > 0) console.warn(JSON.stringify({ status: 'aviso', code: 'VENDAS_COM_VENDEDOR_INVALIDO_IGNORADAS', quantidade: skippedSeller }));
+  return normalized.filter(row => row !== null);
 }
 
 export function saleFilters(url, body, maxProducts) {

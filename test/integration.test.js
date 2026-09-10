@@ -173,6 +173,7 @@ test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.match(vendasSql, /fornecedor_fantasia/i);
   assert.match(vendasSql, /fornecedor_razao/i);
   assert.match(vendasSql, /produto_descricao/i);
+  assert.match(vendasSql, /ELSE CAST\(VE\.DOCUMENTO AS VARCHAR\(20\)\)/i);
   assert.match(vendasSql, /COALESCE\(NULLIF\(TRIM\(CAST\(L\.NUMERONF AS VARCHAR\(50\)\)\), ''\), '0'\) nota_numero/i);
 });
 
@@ -202,6 +203,16 @@ test('venda sem CNPJ cadastrado para o fornecedor preserva o campo como nulo', a
     const result = await call('/vendas', { method: 'POST', body: { produtos: ['001'] } });
     assert.equal(result.status, 200);
     assert.equal(result.body.vendas[0].fornecedor_cnpj, null);
+  });
+});
+
+test('venda sem CPF utilizavel de vendedor e ignorada sem bloquear as demais', async () => {
+  const invalidSeller = { ...sale('001', '2026-09-01 10:00:00'), vendedor: '12345678901234' };
+  await withApi({ cache: { read: async () => ({ ...snapshot(), vendas: [invalidSeller, vendas[1]] }) } }, async call => {
+    const result = await call('/vendas', { method: 'POST', body: { produtos: ['001', '002'] } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.vendas.length, 1);
+    assert.equal(result.body.vendas[0].produto_id, '002');
   });
 });
 
