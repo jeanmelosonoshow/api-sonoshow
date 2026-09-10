@@ -1,7 +1,7 @@
 import { AppError } from './config.js';
 
 const userFields = ['nome', 'filial', 'filial_nome', 'filial_estado', 'filial_cidade', 'filial_regional', 'documento', 'cargo', 'responsavel'];
-const saleFields = ['filial_cnpj', 'pedido_id', 'nota_numero', 'pedido_data_venda', 'vendedor', 'produto_id', 'produto_qtd', 'produto_valor', 'produto_desconto'];
+const saleFields = ['filial_cnpj', 'pedido_id', 'nota_numero', 'pedido_data_venda', 'vendedor', 'produto_id', 'produto_ean', 'produto_qtd', 'produto_valor', 'produto_desconto'];
 const numericFields = new Set(['produto_qtd', 'produto_valor', 'produto_desconto']);
 const invalid = (message) => { throw new AppError(422, 'DATA_INVALID', message); };
 

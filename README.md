@@ -2,7 +2,7 @@
 
 API Node.js para disponibilizar usuarios e vendas do Firebird, diretamente ou pelo cache Upstash alimentado no Windows.
 
-**Estado:** implementacao local com testes sinteticos. SELECT de usuarios configurado; SELECT de vendas e data inicial pendentes. Nenhuma conexao com o Firebird/Upstash real, publicacao na Vercel ou transmissao de dados reais foi feita.
+**Estado:** implementacao local com testes sinteticos. SELECTs de usuarios e vendas configurados; data inicial pendente. Nenhuma conexao com o Firebird/Upstash real, publicacao na Vercel ou transmissao de dados reais foi feita.
 
 ## Fluxo
 
@@ -22,12 +22,13 @@ Arquivo `config/integration.json`:
   "mode": 2,
   "sales": {
     "initialDate": null,
-    "lookbackDays": 60,
+    "lookbackDays": 90,
     "timeZone": "America/Sao_Paulo"
   },
   "cache": {
-    "key": "sonoshow:clubmoveleiro:v1:snapshot",
-    "ttlSeconds": 3600
+    "key": "sonoshow:clubmoveleiro:v2:snapshot",
+    "maxAgeSeconds": 3600,
+    "retentionSeconds": 7776000
   },
   "limits": {
     "maxPayloadBytes": 3000000,
@@ -49,7 +50,7 @@ inicio = maior valor entre sales.initialDate e (data atual - lookbackDays)
 fim exclusivo = inicio do dia seguinte a data atual
 ```
 
-Com `initialDate: "2026-01-01"` e data atual `2026-09-08`, por exemplo, o modo 2 usa `2026-07-10 00:00:00 <= venda < 2026-09-09 00:00:00`. Isso inclui o dia atual inteiro e evita problemas com fracoes de segundo. Se a data inicial for `2026-09-01`, o inicio sera `2026-09-01 00:00:00`.
+Com `initialDate: "2026-01-01"` e data atual `2026-09-08`, por exemplo, o modo 2 usa `2026-06-10 00:00:00 <= venda < 2026-09-09 00:00:00`. Isso inclui o dia atual inteiro e evita problemas com fracoes de segundo. Se a data inicial for `2026-09-01`, o inicio sera `2026-09-01 00:00:00`.
 
 No modo 1 nao se aplica `lookbackDays`. O periodo consultavel vai de `sales.initialDate` ate o dia atual. Se o Club informar `date_start` e `date_end`, esses limites sao enviados como parametros ao SELECT do Firebird, depois de validados. Sem `date_start`, a consulta comeca em `00:00:00` do dia atual; sem `date_start` e `date_end`, retorna somente o dia atual. Uma `date_start` explicita anterior a `sales.initialDate` retorna `DATE_BEFORE_INITIAL` e nao abre a consulta de vendas no banco. O calculo usa `America/Sao_Paulo` tanto no Windows quanto na Vercel.
 
@@ -81,21 +82,22 @@ Use chave Redis diferente e dados de teste no ambiente de preview. `.env` esta e
 
 ## Inserir os SELECTs
 
-O SELECT de usuarios esta em `sql/usuarios.sql`. Preencha `sql/vendas.sql`; ate la, a leitura de vendas retorna `SQL_PENDING`, sem dados inventados e sem apagar o cache.
+Os SELECTs estao em `sql/usuarios.sql` e `sql/vendas.sql`. Ainda falta executa-los contra o Firebird real e validar tipos, campos nulos, volume e plano de execucao.
 
 Aliases de usuarios: `nome`, `filial`, `filial_nome`, `filial_estado`, `filial_cidade`, `filial_regional`, `documento`, `cargo`, `responsavel`.
 
-Aliases de vendas: `filial_cnpj`, `pedido_id`, `nota_numero`, `pedido_data_venda`, `vendedor`, `produto_id`, `produto_qtd`, `produto_valor`, `produto_desconto`.
+Aliases de vendas: `filial_cnpj`, `pedido_id`, `nota_numero`, `pedido_data_venda`, `vendedor`, `produto_id`, `produto_ean`, `produto_qtd`, `produto_valor`, `produto_desconto`.
 
 - Aliases em maiusculas tambem sao aceitos.
 - CPF/CNPJ e identificadores devem vir como texto, preservando zeros iniciais. CPF/CNPJ podem vir com ou sem pontuacao; a API aplica a mascara. A validacao de formato nao verifica digitos verificadores.
 - `responsavel` e obrigatorio e pode ser `NULL` no topo da hierarquia.
 - Quantidade, valor e desconto devem ser numeros, nunca texto com virgula.
 - `pedido_data_venda` deve vir como texto `YYYY-MM-DD HH:MM:SS`, no horario do ERP. Formate no SELECT; nao ha conversao automatica para UTC.
+- `produto_ean` e uma extensao combinada diretamente com o Club Moveleiro. Ele e obrigatorio nesta integracao e sai como texto para preservar zeros iniciais. Um EAN nulo ou vazio interrompe a publicacao do snapshot.
 - O SELECT de vendas deve conter os parametros `:date_start` e `:date_end_exclusive`, aplicados diretamente sobre a coluna nativa de data: `data_venda >= CAST(:date_start AS TIMESTAMP) AND data_venda < CAST(:date_end_exclusive AS TIMESTAMP)`. Os valores sao parametrizados; nao sao concatenados no SQL.
 - Colunas extras nao sao expostas. Nenhuma rota aceita SQL do cliente. O leitor usa transacao somente leitura; configure tambem um usuario Firebird somente de consulta.
 
-No modo 1, o Firebird recebe a intersecao entre o periodo solicitado e o intervalo de `sales.initialDate` ate hoje. Quando o inicio nao e informado, a API usa o inicio do dia atual para impedir uma consulta historica acidental. No modo 2, o Windows extrai somente a janela movel de 60 dias e grava seus limites junto com o snapshot. A Vercel recusa um snapshot com janela diferente da configuracao e, na virada do dia, retorna 503 ate o Windows publicar um snapshot que cubra o novo dia.
+No modo 1, o Firebird recebe a intersecao entre o periodo solicitado e o intervalo de `sales.initialDate` ate hoje. Quando o inicio nao e informado, a API usa o inicio do dia atual para impedir uma consulta historica acidental. No modo 2, o Windows extrai somente a janela movel de 90 dias e grava seus limites junto com o snapshot. A Vercel recusa um snapshot com janela diferente da configuracao e, na virada do dia, retorna 503 ate o Windows publicar um snapshot que cubra o novo dia.
 
 No modo 2, os parametros opcionais enviados pelo Club Moveleiro podem reduzir o periodo, mas nunca amplia-lo alem da janela em cache. No modo 1, podem consultar qualquer periodo cuja data inicial seja igual ou posterior a `sales.initialDate`, limitado ao dia atual. O filtro de produtos e aplicado depois da leitura nesta primeira versao; quando recebermos o SELECT e conhecermos o volume, ele podera ser levado ao Firebird de forma parametrizada.
 
@@ -119,9 +121,11 @@ Alternativa para o Agendador de Tarefas:
 powershell.exe -NoProfile -File "C:\Users\Jean\Documents\Codex\API\api-sonoshow\scripts\sync-windows.ps1"
 ```
 
-O wrapper usa a pasta correta independentemente da pasta inicial da tarefa. Configure, por exemplo, a cada 10 minutos para TTL de 60 minutos, com **nao iniciar nova instancia** quando a anterior estiver em andamento. Nenhuma tarefa foi criada automaticamente. O usuario da tarefa precisa acessar Node.js, `.env` e Firebird. Mantenha o relogio do Windows sincronizado.
+O wrapper usa a pasta correta independentemente da pasta inicial da tarefa. Configure, por exemplo, a cada 10 minutos para frescor maximo de 60 minutos, com **nao iniciar nova instancia** quando a anterior estiver em andamento. Nenhuma tarefa foi criada automaticamente. O usuario da tarefa precisa acessar Node.js, `.env` e Firebird. Mantenha o relogio do Windows sincronizado.
 
-O script calcula a janela uma vez no inicio, consulta e valida ambos os conjuntos e envia os limites junto com os dados. Erro em uma consulta ou registro impede o envio inteiro. A publicacao Redis substitui usuarios e vendas atomicamente, com TTL contado a partir do inicio da extracao. Uploads iguais ou mais antigos retornam 409, preservando a extracao mais recente. Cada execucao substitui o conjunto completo: **nao envie somente deltas**. Listas vazias validas limpam o respectivo conjunto.
+O script calcula a janela uma vez no inicio, consulta e valida ambos os conjuntos e envia os limites junto com os dados. Erro em uma consulta ou registro impede o envio inteiro. A publicacao Redis substitui usuarios e vendas atomicamente. Uploads iguais ou mais antigos retornam 409, preservando a extracao mais recente. Cada execucao substitui o conjunto completo: **nao envie somente deltas**. Listas vazias validas limpam o respectivo conjunto.
+
+O snapshot fica retido no Redis por 90 dias (`retentionSeconds`), mas deixa de ser servido pela API apos 1 hora sem atualizacao (`maxAgeSeconds`). A retencao longa preserva o ultimo conjunto para diagnostico e recuperacao; a verificacao de frescor impede que uma falha silenciosa no Windows apresente dados antigos como atuais. O sincronizador deve continuar executando em intervalos menores que `maxAgeSeconds`.
 
 Saida 0 indica sucesso; 1 indica erro. Nao ha agendamento automatico ou retry cego. Timeout de upload deixa o resultado incerto: o servidor pode ter gravado os dados antes da conexao falhar.
 
@@ -139,9 +143,9 @@ Modo 1 exige endereco Firebird alcancavel a partir da Vercel. IP privado, `127.0
 
 `GET /usuarios` retorna `{ "usuarios": [...] }`.
 
-`POST /vendas` recebe `{ "produtos": ["001", "002"] }` e retorna `{ "vendas": [...] }`. Query parameters opcionais: `date_start` e `date_end`, ambos no formato `YYYY-MM-DD HH:MM:SS`, com limites inclusivos. No modo 1, a ausencia de `date_start` assume o inicio do dia atual, e uma data informada nao pode ser anterior a `sales.initialDate`. No modo 2, os parametros apenas estreitam a janela de 60 dias armazenada. Uma lista vazia de produtos retorna vendas vazias, nao todos os produtos.
+`POST /vendas` recebe `{ "produtos": ["001", "002"] }` e retorna `{ "vendas": [...] }`. Query parameters opcionais: `date_start` e `date_end`, ambos no formato `YYYY-MM-DD HH:MM:SS`, com limites inclusivos. No modo 1, a ausencia de `date_start` assume o inicio do dia atual, e uma data informada nao pode ser anterior a `sales.initialDate`. No modo 2, os parametros apenas estreitam a janela de 90 dias armazenada. Uma lista vazia de produtos retorna vendas vazias, nao todos os produtos. Cada item retornado inclui `produto_ean`.
 
-`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 1, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...] }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
+`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 2, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...] }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
 
 `GET /health` exige o token de leitura e informa processo ativo e modo. Nao comprova acesso ao Firebird nem frescor do cache.
 
@@ -158,10 +162,10 @@ Invoke-RestMethod "$apiUrl/vendas?$query" -Method Post -Headers $apiHeaders -Con
 ## Limites e pendencias
 
 - Snapshot inteiro limitado a 3.000.000 bytes; ate 20.000 linhas por conjunto e 2.000 produtos por filtro. Excesso gera erro, sem truncamento. O limite fica abaixo do payload maximo das Vercel Functions; o plano Upstash precisa comportar o comando. Lotes/paginacao nao estao implementados: volumes maiores exigem adaptacao antes de producao.
-- Cada consulta no modo 2 carrega o snapshot completo. TTL padrao de 1 hora; ajuste com a frequencia do script. Programe uma execucao logo apos a meia-noite para cobrir rapidamente a nova data.
-- No modo 2, a janela movel permite detectar alteracoes apenas dentro dos ultimos `lookbackDays`, respeitando a data inicial. Alteracoes em vendas mais antigas ficam fora da consulta e nao serao percebidas. No modo 1, o historico desde `sales.initialDate` permanece consultavel.
+- Cada consulta no modo 2 carrega o snapshot completo de ate 90 dias. O frescor padrao e 1 hora; ajuste junto com a frequencia do script. Programe uma execucao logo apos a meia-noite para cobrir rapidamente a nova data.
+- No modo 2, a janela movel permite disponibilizar e atualizar os ultimos `lookbackDays`, respeitando a data inicial. Alteracoes em vendas mais antigas ficam fora da consulta. No modo 1, o historico desde `sales.initialDate` permanece consultavel.
 - Cache ausente, invalido ou vencido retorna 503, sem aparentar ausencia de usuarios/vendas.
-- A documentacao pede evitar repeticoes, mas nao define cursor, identificador unico do item de venda ou confirmacao de recebimento. As consultas desta base sao repetiveis e nao marcam dados como entregues, pois isso poderia perder dados em falhas de rede. A entrega incremental/deduplicacao precisa ser acordada antes de producao. Nao deduplicamos por pedido+produto, pois pode descartar itens legitimos.
+- Nao ha controle de enviados nem deduplicacao na API. Conforme alinhado com o desenvolvedor do Club Moveleiro, eles apagam e reinserem os dados do periodo processado para garantir unicidade e incorporar atualizacoes. A API preserva as linhas produzidas pelo SELECT; o `GROUP BY` do proprio SELECT continua consolidando seus itens conforme a regra fornecida.
 - A publicacao Redis e atomica; as duas consultas Firebird sao separadas e nao formam um snapshot transacional unico do ERP.
 - Faltam SELECTs, versao do Firebird, volume/historico necessario, credenciais e teste ponta a ponta na Vercel.
 

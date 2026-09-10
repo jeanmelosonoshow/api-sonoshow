@@ -2,12 +2,13 @@
   "mode": 2,
   "sales": {
     "initialDate": null,
-    "lookbackDays": 60,
+    "lookbackDays": 90,
     "timeZone": "America/Sao_Paulo"
   },
   "cache": {
-    "key": "sonoshow:clubmoveleiro:v1:snapshot",
-    "ttlSeconds": 3600
+    "key": "sonoshow:clubmoveleiro:v2:snapshot",
+    "maxAgeSeconds": 3600,
+    "retentionSeconds": 7776000
   },
   "limits": {
     "maxPayloadBytes": 3000000,

@@ -19,9 +19,10 @@ const env = { API_BEARER_TOKEN: 'r'.repeat(40), SYNC_BEARER_TOKEN: 'w'.repeat(40
 const usuario = { NOME: 'Teste', FILIAL: '00111222000133', FILIAL_NOME: 'Loja', FILIAL_ESTADO: 'SP',
   FILIAL_CIDADE: 'Cidade', FILIAL_REGIONAL: 'Regional', DOCUMENTO: '00100200304', CARGO: 'Gerente', RESPONSAVEL: null };
 const sale = (id, date) => ({ filial_cnpj: '00111222000133', pedido_id: '0001', nota_numero: '0002',
-  pedido_data_venda: date, vendedor: '00100200304', produto_id: id, produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0 });
+  pedido_data_venda: date, vendedor: '00100200304', produto_id: id, produto_ean: `0789000000${id}`,
+  produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0 });
 const vendas = [sale('001', '2026-09-01 10:00:00'), sale('002', '2026-09-02 10:00:00'), sale('001', '2026-09-03 10:00:00')];
-const snapshot = () => ({ schemaVersion: 1, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
+const snapshot = () => ({ schemaVersion: 2, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
 
 async function withApi(options, fn) {
   const server = createServer(createHandler({ env, config: testConfig(), now: () => testNow, ...options }));
@@ -54,6 +55,7 @@ test('modos 1 e 2 preservam contrato, mascaras e filtros inclusivos', async () =
       assert.equal(result.status, 200);
       assert.equal(result.body.vendas.length, 1);
       assert.equal(result.body.vendas[0].pedido_id, '0001');
+      assert.equal(result.body.vendas[0].produto_ean, '0789000000001');
       const empty = await call('/vendas', { method: 'POST', body: { produtos: [] } });
       assert.deepEqual(empty.body, { vendas: [] });
       assert.equal(reads, 2);
@@ -83,6 +85,10 @@ test('snapshot valido substitui ambos datasets; invalido preserva o anterior', a
     const previous = current;
     assert.equal((await upload({ ...fresh(), vendas: [{ ...vendas[0], produto_valor: '15,50' }] })).status, 422);
     assert.equal(current, previous);
+    assert.equal((await upload({ ...fresh(), vendas: [{ ...vendas[0], produto_ean: null }] })).status, 422);
+    assert.equal(current, previous);
+    assert.equal((await upload({ ...fresh(), schemaVersion: 1 })).status, 422);
+    assert.equal(current, previous);
     assert.equal((await upload({ ...fresh(), usuarios: undefined })).status, 422);
     assert.equal((await upload({ ...snapshot(), extractedAt: '2020-01-01T00:00:00.000Z' })).status, 422);
     assert.equal((await call('/usuarios')).body.usuarios.length, 1);
@@ -106,7 +112,7 @@ test('payload acima do limite e bloqueado sem atualizar cache', async () => {
   });
 });
 
-test('Upstash usa GET e publicacao atomica com TTL, sem expor token em URL', async () => {
+test('Upstash usa GET e publicacao atomica com retencao de 90 dias, sem expor token em URL', async () => {
   const commands = [];
   const settings = { UPSTASH_REDIS_REST_URL: 'https://example.upstash.io', UPSTASH_REDIS_REST_TOKEN: 'test-only' };
   const cache = createCache(loadConfig(), settings, async (url, options) => {
@@ -119,7 +125,7 @@ test('Upstash usa GET e publicacao atomica com TTL, sem expor token em URL', asy
   await cache.read();
   assert.equal(commands[0][0], 'EVAL');
   assert.match(commands[0][1], /previous.extractedAt >= incoming.extractedAt/);
-  assert.ok(commands[0][5] > 0 && commands[0][5] <= 3600);
+  assert.ok(commands[0][5] > 0 && commands[0][5] <= 7776000);
   assert.equal(commands[1][0], 'GET');
 });
 
@@ -135,12 +141,37 @@ test('cache vazio, corrompido, expirado e falha HTTP nao viram listas vazias', a
   await assert.rejects(older.write(snapshot()), error => error.status === 409);
 });
 
-test('configuracao rejeita modo invalido, SELECT de usuarios carrega e vendas segue pendente', () => {
+test('cache retido fisicamente deixa de ser servido quando ultrapassa o frescor', async () => {
+  const settings = { UPSTASH_REDIS_REST_URL: 'https://example.upstash.io', UPSTASH_REDIS_REST_TOKEN: 'test-only' };
+  const stale = { ...snapshot(), extractedAt: new Date(Date.now() - 7200000).toISOString() };
+  const cache = createCache(loadConfig(), settings, async () => Response.json({ result: JSON.stringify(stale) }));
+  await assert.rejects(cache.read(), error => error.code === 'CACHE_INVALID');
+});
+
+test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.throws(() => validateConfig({ ...loadConfig(), mode: 3 }), /invalida/);
+  const invalidRetention = loadConfig();
+  invalidRetention.cache.retentionSeconds = invalidRetention.cache.maxAgeSeconds - 1;
+  assert.throws(() => validateConfig(invalidRetention), /invalida/);
   const usuariosSql = readSql('usuarios');
   assert.match(usuariosSql, /^WITH USR_DIRETORIA AS/i);
   assert.match(usuariosSql, /WHERE U\.DOCUMENTO IS NOT NULL$/i);
-  assert.throws(() => readSql('vendas'), error => error.code === 'SQL_PENDING');
+  const vendasSql = readSql('vendas');
+  assert.match(vendasSql, /^WITH VENDAS AS/i);
+  assert.match(vendasSql, /:date_start/i);
+  assert.match(vendasSql, /:date_end_exclusive/i);
+  assert.match(vendasSql, /produto_ean/i);
+});
+
+test('vendas repetidas sao preservadas para o Club substituir o periodo', async () => {
+  const repeated = sale('001', '2026-09-01 10:00:00');
+  await withApi({ cache: { read: async () => ({ ...snapshot(), vendas: [repeated, { ...repeated }] }) } }, async call => {
+    const result = await call('/vendas?date_start=2026-09-01%2000:00:00&date_end=2026-09-01%2023:59:59', {
+      method: 'POST', body: { produtos: ['001'] }
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.vendas.length, 2);
+  });
 });
 
 test('rota Vercel preserva filtros mesmo com URL reescrita e body ja interpretado', async () => {

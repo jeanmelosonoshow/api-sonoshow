@@ -4,18 +4,18 @@ import { loadConfig, validateConfig } from '../src/config.js';
 import { salesWindow, withinWindow, intersectFilters, directQueryWindow, defaultDirectStart, assertDirectStart, assertSnapshotWindow, assertCoverage } from '../src/sales-window.js';
 import { prepareQuery, createFirebirdReader } from '../src/firebird.js';
 
-const config = (initialDate, mode = 2) => ({ ...loadConfig(), mode, sales: { initialDate, lookbackDays: 60, timeZone: 'America/Sao_Paulo' } });
+const config = (initialDate, mode = 2) => ({ ...loadConfig(), mode, sales: { initialDate, lookbackDays: 90, timeZone: 'America/Sao_Paulo' } });
 const now = new Date('2026-09-08T15:00:00Z');
 
-test('janela usa hoje menos 60 dias ou data inicial, escolhendo a maior', () => {
+test('janela usa hoje menos 90 dias ou data inicial, escolhendo a maior', () => {
   assert.deepEqual(salesWindow(config('2026-01-01'), now), {
-    start: '2026-07-10 00:00:00', endExclusive: '2026-09-09 00:00:00', timeZone: 'America/Sao_Paulo'
+    start: '2026-06-10 00:00:00', endExclusive: '2026-09-09 00:00:00', timeZone: 'America/Sao_Paulo'
   });
   assert.equal(salesWindow(config('2026-09-01'), now).start, '2026-09-01 00:00:00');
-  assert.equal(salesWindow(config('2026-07-10'), now).start, '2026-07-10 00:00:00');
+  assert.equal(salesWindow(config('2026-06-10'), now).start, '2026-06-10 00:00:00');
 });
 
-test('modo 1 usa sales.initialDate sem aplicar limite movel de 60 dias', () => {
+test('modo 1 usa sales.initialDate sem aplicar limite movel de 90 dias', () => {
   const window = salesWindow(config('2020-01-01', 1), now);
   assert.deepEqual(window, {
     start: '2020-01-01 00:00:00', endExclusive: '2026-09-09 00:00:00', timeZone: 'America/Sao_Paulo'
@@ -26,12 +26,12 @@ test('hoje usa fuso configurado e subtracao funciona em virada de ano e ano biss
   const c = config('2020-01-01');
   const midnight = salesWindow(c, new Date('2026-09-09T01:30:00Z'));
   assert.equal(midnight.endExclusive, '2026-09-09 00:00:00');
-  assert.equal(salesWindow(c, new Date('2026-01-10T15:00:00Z')).start, '2025-11-11 00:00:00');
-  assert.equal(salesWindow(c, new Date('2024-03-15T15:00:00Z')).start, '2024-01-15 00:00:00');
+  assert.equal(salesWindow(c, new Date('2026-01-10T15:00:00Z')).start, '2025-10-12 00:00:00');
+  assert.equal(salesWindow(c, new Date('2024-03-15T15:00:00Z')).start, '2023-12-16 00:00:00');
 });
 
 test('dia final completo incluido e dias fora da janela excluidos', () => {
-  const dates = ['2026-07-09 23:59:59', '2026-07-10 00:00:00', '2026-09-08 23:59:59', '2026-09-09 00:00:00'];
+  const dates = ['2026-06-09 23:59:59', '2026-06-10 00:00:00', '2026-09-08 23:59:59', '2026-09-09 00:00:00'];
   const rows = dates.map(pedido_data_venda => ({ pedido_data_venda }));
   assert.deepEqual(withinWindow(rows, salesWindow(config('2026-01-01'), now)).map(r => r.pedido_data_venda), dates.slice(1, 3));
 });
@@ -75,7 +75,7 @@ test('data inicial futura nao abre conexao nem consulta banco', async () => {
 test('data inicial ausente, datas invalidas e fuso errado falham explicitamente', () => {
   assert.throws(() => salesWindow(config(null), now), error => error.code === 'INITIAL_DATE_PENDING');
   assert.throws(() => validateConfig(config('2026-02-30')), error => error.code === 'CONFIG_INVALID');
-  assert.throws(() => validateConfig({ ...config('2026-01-01'), sales: { initialDate: '2026-01-01', lookbackDays: 60, timeZone: 'invalido' } }));
+  assert.throws(() => validateConfig({ ...config('2026-01-01'), sales: { initialDate: '2026-01-01', lookbackDays: 90, timeZone: 'invalido' } }));
 });
 
 test('consulta Firebird recebe limites como parametros sem interpolar SQL', () => {

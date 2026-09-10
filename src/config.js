@@ -21,10 +21,11 @@ export function validateConfig(config) {
   if (typeof sales.timeZone !== 'string' || !sales.timeZone) bad();
   try { new Intl.DateTimeFormat('en', { timeZone: sales.timeZone }); } catch { bad(); }
   if (typeof config.cache?.key !== 'string' || !config.cache.key.trim()) bad();
-  for (const value of [config.cache.ttlSeconds, config.limits?.maxPayloadBytes,
+  for (const value of [config.cache.maxAgeSeconds, config.cache.retentionSeconds, config.limits?.maxPayloadBytes,
     config.limits?.maxRowsPerDataset, config.limits?.maxProducts, config.limits?.requestTimeoutMs]) {
     if (!Number.isSafeInteger(value) || value <= 0) bad();
   }
+  if (config.cache.retentionSeconds < config.cache.maxAgeSeconds) bad();
   if (config.limits.maxPayloadBytes > 3000000 || config.limits.requestTimeoutMs > 25000) bad();
   return config;
 }

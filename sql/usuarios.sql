@@ -55,10 +55,11 @@ USR_VENDEDOR AS (
         FL.UF filial_estado,
         FL.CIDADE filial_cidade,
         SUBSTRING(SU.NOMEFUNCIONARIO FROM 1 FOR POSITION(' ', SU.NOMEFUNCIONARIO, 1)) filial_regional,
-        F.CPF documento,
+        COALESCE(F.CPF,V.DOCUMENTO) documento,
         'VENDEDOR' cargo,
         GR.CPF responsavel
     FROM FUNCIONARIO F
+    JOIN VENDEDOR V ON V.IDVENDEDOR = F.IDVENDEDOR
     JOIN FILIAL FL ON FL.IDFILIAL = F.IDFILIAL
     JOIN FUNCIONARIO GR
       ON GR.IDFILIAL = F.IDFILIAL

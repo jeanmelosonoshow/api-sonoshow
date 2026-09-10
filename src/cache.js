@@ -36,16 +36,16 @@ export function createCache(config, env = process.env, fetcher = fetch) {
       if (raw === null) throw new AppError(503, 'CACHE_EMPTY', 'Cache ausente ou expirado. Execute a sincronizacao no Windows.');
       try {
         const snapshot = JSON.parse(raw);
-        if (snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.usuarios) || !Array.isArray(snapshot.vendas) ||
+        if (snapshot.schemaVersion !== 2 || !Array.isArray(snapshot.usuarios) || !Array.isArray(snapshot.vendas) ||
             !Number.isFinite(Date.parse(snapshot.extractedAt)) || Date.parse(snapshot.extractedAt) > Date.now() + 60000 ||
-            Date.now() - Date.parse(snapshot.extractedAt) >= config.cache.ttlSeconds * 1000) throw new Error();
+            Date.now() - Date.parse(snapshot.extractedAt) >= config.cache.maxAgeSeconds * 1000) throw new Error();
         return snapshot;
       } catch {
         throw new AppError(503, 'CACHE_INVALID', 'Cache invalido ou desatualizado. Execute nova sincronizacao.');
       }
     },
     async write(snapshot) {
-      const remainingTtl = Math.floor(config.cache.ttlSeconds - (Date.now() - Date.parse(snapshot.extractedAt)) / 1000);
+      const remainingTtl = Math.floor(config.cache.retentionSeconds - (Date.now() - Date.parse(snapshot.extractedAt)) / 1000);
       if (remainingTtl < 1) throw new AppError(422, 'SNAPSHOT_EXPIRED', 'Extracao antiga demais para publicar.');
       const result = await command(['EVAL', publishScript, 1, config.cache.key, JSON.stringify(snapshot), remainingTtl]);
       if (result !== 1) throw new AppError(409, 'SNAPSHOT_OLD', 'Ja existe uma extracao igual ou mais recente no cache.');

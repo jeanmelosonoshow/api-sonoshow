@@ -69,13 +69,13 @@ export function createHandler({ config: providedConfig, env = process.env, reade
         if (config.mode !== 2) throw new AppError(409, 'MODE_CONFLICT', 'Publicacao de cache disponivel somente no modo 2.');
         const body = await jsonBody(req, config.limits.maxPayloadBytes);
         const extractedMs = Date.parse(body.extractedAt);
-        if (body.schemaVersion !== 1 || typeof body.extractedAt !== 'string' || !Number.isFinite(extractedMs) ||
+        if (body.schemaVersion !== 2 || typeof body.extractedAt !== 'string' || !Number.isFinite(extractedMs) ||
             new Date(extractedMs).toISOString() !== body.extractedAt || extractedMs > requestTime.getTime() + 60000 ||
-            requestTime.getTime() - extractedMs >= config.cache.ttlSeconds * 1000) {
-          throw new AppError(422, 'SNAPSHOT_INVALID', 'Informe schemaVersion 1 e extractedAt ISO UTC recente.');
+            requestTime.getTime() - extractedMs >= config.cache.maxAgeSeconds * 1000) {
+          throw new AppError(422, 'SNAPSHOT_INVALID', 'Informe schemaVersion 2 e extractedAt ISO UTC recente.');
         }
         assertSnapshotWindow(body, config);
-        const snapshot = { schemaVersion: 1, extractedAt: body.extractedAt, salesWindow: body.salesWindow,
+        const snapshot = { schemaVersion: 2, extractedAt: body.extractedAt, salesWindow: body.salesWindow,
           usuarios: normalizeRows('usuarios', body.usuarios, config.limits.maxRowsPerDataset),
           vendas: normalizeRows('vendas', body.vendas, config.limits.maxRowsPerDataset) };
         if (withinWindow(snapshot.vendas, snapshot.salesWindow).length !== snapshot.vendas.length) {
