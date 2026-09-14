@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { AppError, loadConfig, requiredEnv } from './config.js';
-import { normalizeRows, saleFilters, filterSales } from './data.js';
+import { normalizeRows, normalizeRejected, saleFilters, filterSales } from './data.js';
 import { createCache } from './cache.js';
 import { createFirebirdReader } from './firebird.js';
 import { salesWindow, withinWindow, intersectFilters, directQueryWindow, defaultDirectStart, assertDirectStart, assertSnapshotWindow, assertCoverage } from './sales-window.js';
@@ -55,35 +55,59 @@ export function createHandler({ config: providedConfig, env = process.env, reade
       const requestTime = now();
       const url = new URL(req.url, 'http://localhost');
       const path = route || url.pathname;
-      const routes = { '/health': 'GET', '/usuarios': 'GET', '/vendas': 'POST', '/internal/snapshot': 'PUT' };
+      const routes = { '/health': 'GET', '/usuarios': 'GET', '/vendas': 'POST', '/internal/snapshot': 'PUT',
+        '/internal/rejeitados/usuarios': 'GET', '/internal/rejeitados/vendas': 'GET' };
       if (!Object.hasOwn(routes, path)) throw new AppError(404, 'NOT_FOUND', 'Rota inexistente.');
       if (req.method !== routes[path]) {
         res.setHeader('Allow', routes[path]);
         throw new AppError(405, 'METHOD_NOT_ALLOWED', 'Metodo nao permitido.');
       }
       const ingestion = path === '/internal/snapshot';
-      authorize(req, env, ingestion ? 'SYNC_BEARER_TOKEN' : 'API_BEARER_TOKEN');
+      const internal = path.startsWith('/internal/');
+      authorize(req, env, internal ? 'SYNC_BEARER_TOKEN' : 'API_BEARER_TOKEN');
       if (path === '/health') return reply(200, { status: 'ok', mode: config.mode });
       const storage = cache || createCache(config, env);
+      if (path.startsWith('/internal/rejeitados/')) {
+        const rejectedDataset = path.endsWith('/usuarios') ? 'usuarios' : 'vendas';
+        if (config.mode === 2) {
+          const snapshot = await storage.read();
+          const rows = snapshot.rejeitados[rejectedDataset];
+          return reply(200, { dataset: rejectedDataset, extractedAt: snapshot.extractedAt, total: rows.length, rejeitados: rows });
+        }
+        let queryWindow;
+        if (rejectedDataset === 'vendas') {
+          const fullWindow = salesWindow(config, requestTime, 1);
+          queryWindow = { ...fullWindow, start: defaultDirectStart({ start: null }, fullWindow).start };
+        }
+        const rejectedRows = [];
+        const rawRows = await (reader || createFirebirdReader(config, env))(rejectedDataset, queryWindow);
+        normalizeRows(rejectedDataset, rawRows, config.limits.maxRowsPerDataset, rejectedRows);
+        return reply(200, { dataset: rejectedDataset, extractedAt: requestTime.toISOString(), total: rejectedRows.length, rejeitados: rejectedRows });
+      }
       if (ingestion) {
         if (config.mode !== 2) throw new AppError(409, 'MODE_CONFLICT', 'Publicacao de cache disponivel somente no modo 2.');
         const body = await jsonBody(req, config.limits.maxPayloadBytes);
         const extractedMs = Date.parse(body.extractedAt);
-        if (body.schemaVersion !== 3 || typeof body.extractedAt !== 'string' || !Number.isFinite(extractedMs) ||
+        if (body.schemaVersion !== 4 || typeof body.extractedAt !== 'string' || !Number.isFinite(extractedMs) ||
             new Date(extractedMs).toISOString() !== body.extractedAt || extractedMs > requestTime.getTime() + 60000 ||
             requestTime.getTime() - extractedMs >= config.cache.maxAgeSeconds * 1000) {
-          throw new AppError(422, 'SNAPSHOT_INVALID', 'Informe schemaVersion 3 e extractedAt ISO UTC recente.');
+          throw new AppError(422, 'SNAPSHOT_INVALID', 'Informe schemaVersion 4 e extractedAt ISO UTC recente.');
         }
         assertSnapshotWindow(body, config);
-        const snapshot = { schemaVersion: 3, extractedAt: body.extractedAt, salesWindow: body.salesWindow,
+        const snapshot = { schemaVersion: 4, extractedAt: body.extractedAt, salesWindow: body.salesWindow,
           usuarios: normalizeRows('usuarios', body.usuarios, config.limits.maxRowsPerDataset),
-          vendas: normalizeRows('vendas', body.vendas, config.limits.maxRowsPerDataset) };
+          vendas: normalizeRows('vendas', body.vendas, config.limits.maxRowsPerDataset),
+          rejeitados: {
+            usuarios: normalizeRejected('usuarios', body.rejeitados?.usuarios, config.limits.maxRowsPerDataset),
+            vendas: normalizeRejected('vendas', body.rejeitados?.vendas, config.limits.maxRowsPerDataset)
+          } };
         if (withinWindow(snapshot.vendas, snapshot.salesWindow).length !== snapshot.vendas.length) {
           throw new AppError(422, 'SALES_OUTSIDE_WINDOW', 'Snapshot contem vendas fora da janela configurada.');
         }
         if (Buffer.byteLength(JSON.stringify(snapshot)) > config.limits.maxPayloadBytes) throw new AppError(413, 'PAYLOAD_TOO_LARGE', 'Snapshot excede o limite apos formatacao.');
         await storage.write(snapshot);
-        return reply(200, { ok: true, extractedAt: snapshot.extractedAt, usuarios: snapshot.usuarios.length, vendas: snapshot.vendas.length });
+        return reply(200, { ok: true, extractedAt: snapshot.extractedAt, usuarios: snapshot.usuarios.length, vendas: snapshot.vendas.length,
+          usuariosRejeitados: snapshot.rejeitados.usuarios.length, vendasRejeitadas: snapshot.rejeitados.vendas.length });
       }
       const dataset = path.slice(1);
       let filters = dataset === 'vendas' ? saleFilters(url, await jsonBody(req, config.limits.maxPayloadBytes), config.limits.maxProducts) : null;

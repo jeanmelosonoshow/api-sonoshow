@@ -5,6 +5,47 @@ const saleFields = ['filial_cnpj', 'pedido_id', 'nota_numero', 'pedido_data_vend
 const numericFields = new Set(['produto_qtd', 'produto_valor', 'produto_desconto']);
 const invalid = (message) => { throw new AppError(422, 'DATA_INVALID', message); };
 
+function diagnosticValue(value, maximum = 120) {
+  if (value === null || value === undefined) return null;
+  if (Buffer.isBuffer(value)) value = value.toString('utf8');
+  if (!['string', 'number', 'bigint'].includes(typeof value)) return null;
+  return String(value).trim().slice(0, maximum) || null;
+}
+
+function rejectedRecord(dataset, input, index, error) {
+  const source = input && typeof input === 'object' && !Array.isArray(input)
+    ? Object.fromEntries(Object.entries(input).map(([key, value]) => [key.trim().toLowerCase(), value]))
+    : {};
+  const base = { registro: index + 1, motivo: String(error.message).slice(0, 500) };
+  return dataset === 'usuarios'
+    ? { ...base, nome: diagnosticValue(source.nome), documento: diagnosticValue(source.documento, 30) }
+    : { ...base, pedido_id: diagnosticValue(source.pedido_id, 60), produto_id: diagnosticValue(source.produto_id, 60),
+        vendedor: diagnosticValue(source.vendedor, 30), filial_cnpj: diagnosticValue(source.filial_cnpj, 30) };
+}
+
+export function normalizeRejected(dataset, rows, maxRows) {
+  if (!['usuarios', 'vendas'].includes(dataset) || !Array.isArray(rows) || rows.length > maxRows) {
+    throw new AppError(422, 'REJECTIONS_INVALID', 'Lista de registros rejeitados invalida.');
+  }
+  const fields = dataset === 'usuarios'
+    ? ['nome', 'documento']
+    : ['pedido_id', 'produto_id', 'vendedor', 'filial_cnpj'];
+  return rows.map(item => {
+    if (!item || !Number.isSafeInteger(item.registro) || item.registro < 1 ||
+        typeof item.motivo !== 'string' || !item.motivo.trim() || item.motivo.length > 500) {
+      throw new AppError(422, 'REJECTIONS_INVALID', 'Registro rejeitado invalido.');
+    }
+    const result = { registro: item.registro, motivo: item.motivo.trim() };
+    for (const field of fields) {
+      if (item[field] !== null && item[field] !== undefined && typeof item[field] !== 'string') {
+        throw new AppError(422, 'REJECTIONS_INVALID', `Campo ${field} invalido em rejeitados.`);
+      }
+      result[field] = item[field]?.trim().slice(0, 120) || null;
+    }
+    return result;
+  });
+}
+
 export function validDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return false;
   const date = new Date(value.replace(' ', 'T') + 'Z');
@@ -21,10 +62,9 @@ function documentMask(value, size, field) {
     : digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
 }
 
-export function normalizeRows(dataset, rows, maxRows) {
+export function normalizeRows(dataset, rows, maxRows, rejectedRows = []) {
   if (!['usuarios', 'vendas'].includes(dataset) || !Array.isArray(rows)) invalid('Conjunto de dados invalido.');
   if (rows.length > maxRows) throw new AppError(413, 'TOO_MANY_ROWS', 'Conjunto excede o limite de registros.');
-  let skippedSeller = 0;
   const normalized = rows.map((input, index) => {
     try {
       if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(`Registro ${index} invalido.`);
@@ -58,15 +98,18 @@ export function normalizeRows(dataset, rows, maxRows) {
       if (dataset === 'vendas' && !validDate(row.pedido_data_venda)) invalid(`Registro ${index}: data da venda invalida.`);
       return row;
     } catch (error) {
+      if (dataset === 'usuarios' && error instanceof AppError && error.code === 'DATA_INVALID') {
+        rejectedRows.push(rejectedRecord(dataset, input, index, error));
+        return null;
+      }
       if (dataset === 'vendas' && error instanceof AppError && error.code === 'DATA_INVALID' &&
           error.message.includes('vendedor')) {
-        skippedSeller++;
+        rejectedRows.push(rejectedRecord(dataset, input, index, error));
         return null;
       }
       throw error;
     }
   });
-  if (skippedSeller > 0) console.warn(JSON.stringify({ status: 'aviso', code: 'VENDAS_COM_VENDEDOR_INVALIDO_IGNORADAS', quantidade: skippedSeller }));
   return normalized.filter(row => row !== null);
 }
 

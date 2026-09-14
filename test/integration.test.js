@@ -23,7 +23,8 @@ const sale = (id, date) => ({ filial_cnpj: '111222000133', pedido_id: '0001', no
   produto_descricao: `Produto ${id}`, produto_qtd: 2, produto_valor: 15.5, produto_desconto: 0,
   fornecedor_cnpj: '98765432000110', fornecedor_razao: 'Fornecedor Teste Ltda', fornecedor_fantasia: 'Fornecedor Teste' });
 const vendas = [sale('001', '2026-09-01 10:00:00'), sale('002', '2026-09-02 10:00:00'), sale('001', '2026-09-03 10:00:00')];
-const snapshot = () => ({ schemaVersion: 3, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow), usuarios: [usuario], vendas });
+const snapshot = () => ({ schemaVersion: 4, extractedAt: new Date().toISOString(), salesWindow: salesWindow(testConfig(), testNow),
+  usuarios: [usuario], vendas, rejeitados: { usuarios: [], vendas: [] } });
 
 async function withApi(options, fn) {
   const server = createServer(createHandler({ env, config: testConfig(), now: () => testNow, ...options }));
@@ -141,7 +142,7 @@ test('cache aceita os nomes KV_REST_API fornecidos pela integracao da Vercel', a
     assert.equal(options.headers.Authorization, 'Bearer token-kv');
     return Response.json({ result: JSON.stringify(snapshot()) });
   });
-  assert.equal((await cache.read()).schemaVersion, 3);
+  assert.equal((await cache.read()).schemaVersion, 4);
 });
 
 test('cache vazio, corrompido, expirado e falha HTTP nao viram listas vazias', async () => {
@@ -223,6 +224,24 @@ test('venda sem CPF utilizavel de vendedor e ignorada sem bloquear as demais', a
     assert.equal(result.status, 200);
     assert.equal(result.body.vendas.length, 1);
     assert.equal(result.body.vendas[0].produto_id, '002');
+  });
+});
+
+test('endpoints internos mostram usuarios e vendas rejeitados somente com token de sincronizacao', async () => {
+  const cached = { ...snapshot(), rejeitados: {
+    usuarios: [{ registro: 42, motivo: 'Documento ausente', nome: 'Usuario pendente', documento: null }],
+    vendas: [{ registro: 54, motivo: 'CPF de vendedor invalido', pedido_id: '9001', produto_id: '123',
+      vendedor: '12345678901234', filial_cnpj: '05507218000150' }]
+  } };
+  await withApi({ cache: { read: async () => cached } }, async call => {
+    const users = await call('/internal/rejeitados/usuarios', { token: env.SYNC_BEARER_TOKEN });
+    assert.equal(users.status, 200);
+    assert.equal(users.body.total, 1);
+    assert.equal(users.body.rejeitados[0].nome, 'Usuario pendente');
+    const sales = await call('/internal/rejeitados/vendas', { token: env.SYNC_BEARER_TOKEN });
+    assert.equal(sales.status, 200);
+    assert.equal(sales.body.rejeitados[0].pedido_id, '9001');
+    assert.equal((await call('/internal/rejeitados/vendas')).status, 401);
   });
 });
 

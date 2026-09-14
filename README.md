@@ -153,7 +153,9 @@ Modo 1 exige endereco Firebird alcancavel a partir da Vercel. IP privado, `127.0
 
 `POST /vendas` recebe `{ "produtos": ["001", "002"] }` e retorna `{ "vendas": [...] }`. Query parameters opcionais: `date_start` e `date_end`, ambos no formato `YYYY-MM-DD HH:MM:SS`, com limites inclusivos. No modo 1, a ausencia de `date_start` assume o inicio do dia atual, e uma data informada nao pode ser anterior a `sales.initialDate`. No modo 2, os parametros apenas estreitam a janela de 90 dias armazenada. Uma lista vazia de produtos retorna vendas vazias, nao todos os produtos. Cada item retornado inclui `produto_ean`.
 
-`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 3, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...] }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
+`PUT /internal/snapshot` usa o token de sincronizacao e aceita `{ "schemaVersion": 4, "extractedAt": "<ISO UTC>", "usuarios": [...], "vendas": [...], "rejeitados": { "usuarios": [...], "vendas": [...] } }`. O script monta esse corpo automaticamente. Disponivel somente no modo 2.
+
+Os registros descartados por dados invalidos podem ser consultados com `SYNC_BEARER_TOKEN` em `GET /internal/rejeitados/usuarios` e `GET /internal/rejeitados/vendas`. A resposta informa a extracao, o total, o motivo e somente os identificadores necessarios para corrigir o Firebird. Esses endpoints internos nao aceitam `API_BEARER_TOKEN`.
 
 `GET /health` exige o token de leitura e informa processo ativo e modo. Nao comprova acesso ao Firebird nem frescor do cache.
 

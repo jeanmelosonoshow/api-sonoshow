@@ -14,9 +14,10 @@ try {
   const extractedAt = new Date().toISOString();
   const window = salesWindow(config, new Date(extractedAt));
   const read = createFirebirdReader(config);
-  const snapshot = { schemaVersion: 3, extractedAt, salesWindow: window };
+  const snapshot = { schemaVersion: 4, extractedAt, salesWindow: window,
+    rejeitados: { usuarios: [], vendas: [] } };
   for (const dataset of ['usuarios', 'vendas']) {
-    snapshot[dataset] = normalizeRows(dataset, await read(dataset, window), config.limits.maxRowsPerDataset);
+    snapshot[dataset] = normalizeRows(dataset, await read(dataset, window), config.limits.maxRowsPerDataset, snapshot.rejeitados[dataset]);
   }
   snapshot.vendas = withinWindow(snapshot.vendas, window);
   const body = JSON.stringify(snapshot);
@@ -41,7 +42,9 @@ try {
     if (result.ok !== true || result.extractedAt !== extractedAt) throw new AppError(502, 'UPLOAD_UNCONFIRMED', 'Servidor nao confirmou a extracao enviada.');
   }
   console.log(JSON.stringify({ status: checkOnly ? 'validado_sem_envio' : 'publicado', extractedAt,
-    salesWindow: window, usuarios: snapshot.usuarios.length, vendas: snapshot.vendas.length, bytes: Buffer.byteLength(body) }));
+    salesWindow: window, usuarios: snapshot.usuarios.length, vendas: snapshot.vendas.length,
+    usuariosRejeitados: snapshot.rejeitados.usuarios.length, vendasRejeitadas: snapshot.rejeitados.vendas.length,
+    bytes: Buffer.byteLength(body) }));
 } catch (error) {
   console.error(JSON.stringify({ status: 'erro', code: error instanceof AppError ? error.code : 'SYNC_FAILED',
     message: error instanceof AppError ? error.message : 'Falha na sincronizacao. Verifique rede e configuracao.' }));

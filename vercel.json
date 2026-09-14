@@ -10,6 +10,8 @@
     { "source": "/usuarios", "destination": "/api/usuarios" },
     { "source": "/vendas", "destination": "/api/vendas" },
     { "source": "/internal/snapshot", "destination": "/api/snapshot" },
+    { "source": "/internal/rejeitados/usuarios", "destination": "/api/rejeitados-usuarios" },
+    { "source": "/internal/rejeitados/vendas", "destination": "/api/rejeitados-vendas" },
     { "source": "/health", "destination": "/api/health" }
   ]
 }
