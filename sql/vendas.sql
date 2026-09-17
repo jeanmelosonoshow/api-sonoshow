@@ -7,8 +7,8 @@ WITH VENDAS AS (
         SUBSTRING(CAST(S.DATASAIDA AS VARCHAR(24)) FROM 1 FOR 19) pedido_data_venda,
         CASE
           WHEN CHAR_LENGTH(REPLACE(REPLACE(REPLACE(TRIM(CAST(V.CPF AS VARCHAR(20))), '.', ''), '-', ''), '/', '')) BETWEEN 1 AND 11
-            THEN CAST(V.CPF AS VARCHAR(20))
-          ELSE CAST(VE.DOCUMENTO AS VARCHAR(20))
+            THEN CAST( coalesce(V.CPF,VE.DOCUMENTO)  AS VARCHAR(20))
+          ELSE NULL
         END vendedor,
         CAST(I.IDPRODUTO AS VARCHAR(50)) produto_id,
         CAST(P.EAN AS VARCHAR(50)) produto_ean,
