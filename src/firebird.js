@@ -41,7 +41,7 @@ export function prepareQuery(dataset, sql, window, supplierIds = dataset === 've
     params[name] = id;
     return `:${name}`;
   });
-  const clause = placeholders.length ? `AND FP.IDFORNECEDOR IN (${placeholders.join(', ')})` : '';
+  const clause = placeholders.length ? `AND FO.IDFORNECEDOR IN (${placeholders.join(', ')})` : '';
   return { sql: sql.replace(marker, clause), params };
 }
 
