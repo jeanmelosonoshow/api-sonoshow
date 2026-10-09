@@ -11,6 +11,7 @@ import { salesWindow } from '../src/sales-window.js';
 const testNow = new Date('2026-09-08T15:00:00.000Z');
 function testConfig() {
   const config = loadConfig();
+  config.mode = 2;
   config.sales.initialDate = '2026-01-01';
   return config;
 }
@@ -112,6 +113,7 @@ test('modo 1 recusa upload e nao faz fallback silencioso', async () => {
 
 test('payload acima do limite e bloqueado sem atualizar cache', async () => {
   const config = loadConfig();
+  config.mode = 2;
   config.limits.maxPayloadBytes = 50;
   await withApi({ config, cache: { write: () => assert.fail('nao pode escrever') } }, async call => {
     assert.equal((await call('/internal/snapshot', { method: 'PUT', token: env.SYNC_BEARER_TOKEN, body: snapshot() })).status, 413);
@@ -184,7 +186,7 @@ test('configuracao rejeita modo invalido e os dois SELECTs carregam', () => {
   assert.match(vendasSql, /fornecedor_fantasia/i);
   assert.match(vendasSql, /fornecedor_razao/i);
   assert.match(vendasSql, /produto_descricao/i);
-  assert.match(vendasSql, /ELSE CAST\(VE\.DOCUMENTO AS VARCHAR\(20\)\)/i);
+  assert.match(vendasSql, /CAST\(\s*COALESCE\(V\.CPF,\s*VE\.DOCUMENTO\)\s+AS VARCHAR\(20\)\)/i);
   assert.match(vendasSql, /COALESCE\(NULLIF\(TRIM\(CAST\(L\.NUMERONF AS VARCHAR\(50\)\)\), ''\), '0'\) nota_numero/i);
 });
 

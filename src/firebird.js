@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
-import Firebird from 'node-firebird';
-import { AppError, requiredEnv } from './config.js';
+import { AppError } from './config.js';
+import { createGatewayQuery } from './gateway.js';
 import { salesWindow } from './sales-window.js';
+
+const MAX_GATEWAY_PARAMS = 1000;
 
 export function readSql(dataset) {
   if (!['usuarios', 'vendas'].includes(dataset)) throw new Error('Dataset invalido');
@@ -19,7 +21,7 @@ export function readSupplierIds() {
   } catch {
     throw new AppError(503, 'FILTER_CONFIG_INVALID', 'Nao foi possivel ler config/sales-filter.json.');
   }
-  if (!config || !Array.isArray(config.supplierIds) || config.supplierIds.length > 1000 ||
+  if (!config || !Array.isArray(config.supplierIds) || config.supplierIds.length > MAX_GATEWAY_PARAMS - 2 ||
       config.supplierIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
     throw new AppError(503, 'FILTER_CONFIG_INVALID', 'supplierIds deve ser uma lista de inteiros positivos.');
   }
@@ -35,17 +37,28 @@ export function prepareQuery(dataset, sql, window, supplierIds = dataset === 've
   if (!sql.includes(marker)) {
     throw new AppError(503, 'SQL_FILTER_REQUIRED', `SELECT de vendas deve conter o marcador ${marker}.`);
   }
-  const params = { date_start: window.start, date_end_exclusive: window.endExclusive };
+  const values = { date_start: window.start, date_end_exclusive: window.endExclusive };
   const placeholders = supplierIds.map((id, index) => {
     const name = `supplier_id_${index}`;
-    params[name] = id;
+    values[name] = id;
     return `:${name}`;
   });
   const clause = placeholders.length ? `AND FO.IDFORNECEDOR IN (${placeholders.join(', ')})` : '';
-  return { sql: sql.replace(marker, clause), params };
+  const params = [];
+  const positionalSql = sql.replace(marker, clause).replace(/:([a-z_][a-z0-9_]*)/gi, (_match, name) => {
+    if (!Object.hasOwn(values, name)) {
+      throw new AppError(503, 'SQL_PARAMETER_INVALID', `Parametro SQL nao reconhecido: ${name}.`);
+    }
+    params.push(values[name]);
+    return '?';
+  });
+  if (params.length > MAX_GATEWAY_PARAMS) {
+    throw new AppError(503, 'SQL_PARAMETER_LIMIT', 'A consulta excede o limite de parametros do Gateway.');
+  }
+  return { sql: positionalSql, params };
 }
 
-export function createFirebirdReader(config, env = process.env) {
+export function createFirebirdReader(config, env = process.env, fetcher = fetch) {
   return async function read(dataset, window) {
     if (dataset === 'vendas') {
       window ||= salesWindow(config);
@@ -53,33 +66,6 @@ export function createFirebirdReader(config, env = process.env) {
     }
     const sql = readSql(dataset);
     const query = prepareQuery(dataset, sql, window);
-    const options = {
-      host: requiredEnv(env, 'FIREBIRD_HOST'),
-      port: Number(env.FIREBIRD_PORT || 3050),
-      database: requiredEnv(env, 'FIREBIRD_DATABASE'),
-      user: requiredEnv(env, 'FIREBIRD_USER'),
-      password: requiredEnv(env, 'FIREBIRD_PASSWORD'),
-      encoding: env.FIREBIRD_ENCODING || 'UTF8',
-      namedPlaceholders: true,
-      connectTimeout: config.limits.requestTimeoutMs
-    };
-    if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65535) {
-      throw new AppError(503, 'CONFIG_INVALID', 'Porta Firebird invalida.');
-    }
-    const pool = Firebird.pool(1, options);
-    try {
-      return await pool.withConnection(async db => {
-        const transaction = await db.transactionAsync(Firebird.ISOLATION_READ_COMMITTED_READ_ONLY);
-        try {
-          return await transaction.queryAsync(query.sql, query.params, { signal: AbortSignal.timeout(config.limits.requestTimeoutMs) });
-        } finally {
-          await transaction.rollbackAsync();
-        }
-      });
-    } catch {
-      throw new AppError(503, 'FIREBIRD_UNAVAILABLE', 'Falha ao consultar o Firebird. Verifique rede, credenciais, versao e SELECT.');
-    } finally {
-      await pool.destroyAsync();
-    }
+    return createGatewayQuery(config, env, fetcher)(query.sql, query.params);
   };
 }

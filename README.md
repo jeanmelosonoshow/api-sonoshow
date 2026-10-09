@@ -1,15 +1,15 @@
 # API Sonoshow — Club Moveleiro
 
-API Node.js para disponibilizar usuarios e vendas do Firebird, diretamente ou pelo cache Upstash alimentado no Windows.
+API Node.js para disponibilizar usuarios e vendas do Firebird pelo SonoShowGateway, com o modo de snapshot Upstash preservado para contingencia.
 
-**Estado:** implementacao local com testes sinteticos. SELECTs de usuarios e vendas configurados; data inicial pendente. Nenhuma conexao com o Firebird/Upstash real, publicacao na Vercel ou transmissao de dados reais foi feita.
+**Estado:** configurada em modo 1 para consultas em tempo real pelo Gateway. Os SELECTs de usuarios e vendas e a data inicial estao configurados.
 
 ## Fluxo
 
 O Club Moveleiro consulta a API que voce publica: `GET /usuarios` e `POST /vendas`, autenticados por Bearer Token. A documentacao fornecida nao descreve um endpoint externo para receber cadastros enviados por voce.
 
-- Modo 1: Club Moveleiro → Vercel → Firebird → resposta.
-- Modo 2: Windows → Firebird → Vercel → Upstash; Club Moveleiro → Vercel → Upstash → resposta.
+- Modo 1: Club Moveleiro → Vercel → Gateway → Firebird → resposta.
+- Modo 2: Windows → Gateway → Firebird → Vercel → Upstash; Club Moveleiro → Vercel → Upstash → resposta.
 
 Contrato conferido em https://www.clubmoveleiro.com.br/integracao em 08/09/2026.
 
@@ -19,7 +19,7 @@ Arquivo `config/integration.json`:
 
 ```json
 {
-  "mode": 2,
+  "mode": 1,
   "sales": {
     "initialDate": null,
     "lookbackDays": 90,
@@ -39,7 +39,7 @@ Arquivo `config/integration.json`:
 }
 ```
 
-`mode: 1` usa somente Firebird; `mode: 2` usa somente Upstash. Nao ha troca automatica em caso de erro. Alterar o JSON exige novo deploy na Vercel. Mantenha a copia do Windows atualizada. Senhas ficam nas variaveis de ambiente, fora do JSON.
+`mode: 1` consulta o Firebird em tempo real pelo Gateway; `mode: 2` usa somente Upstash. O projeto esta configurado em `mode: 1`, portanto o antigo sincronizador periodico e a janela movel do Redis nao sao necessarios para servir as rotas publicas. Alterar o JSON exige novo deploy na Vercel. Segredos ficam nas variaveis de ambiente, fora do JSON.
 
 Antes de consultar vendas, substitua `null` em `sales.initialDate` pela data inicial no formato `YYYY-MM-DD`.
 
@@ -52,7 +52,7 @@ fim exclusivo = inicio do dia seguinte a data atual
 
 Com `initialDate: "2026-01-01"` e data atual `2026-09-08`, por exemplo, o modo 2 usa `2026-06-10 00:00:00 <= venda < 2026-09-09 00:00:00`. Isso inclui o dia atual inteiro e evita problemas com fracoes de segundo. Se a data inicial for `2026-09-01`, o inicio sera `2026-09-01 00:00:00`.
 
-No modo 1 nao se aplica `lookbackDays`. O periodo consultavel vai de `sales.initialDate` ate o dia atual. Se o Club informar `date_start` e `date_end`, esses limites sao enviados como parametros ao SELECT do Firebird, depois de validados. Sem `date_start`, a consulta comeca em `00:00:00` do dia atual; sem `date_start` e `date_end`, retorna somente o dia atual. Uma `date_start` explicita anterior a `sales.initialDate` retorna `DATE_BEFORE_INITIAL` e nao abre a consulta de vendas no banco. O calculo usa `America/Sao_Paulo` tanto no Windows quanto na Vercel.
+No modo 1 nao se aplica `lookbackDays`. O periodo consultavel vai de `sales.initialDate` ate o dia atual. Se o Club informar `date_start` e `date_end`, esses limites sao enviados como parametros posicionais ao SELECT executado pelo Gateway, depois de validados. Sem `date_start`, a consulta comeca em `00:00:00` do dia atual; sem `date_start` e `date_end`, retorna somente o dia atual. Uma `date_start` explicita anterior a `sales.initialDate` retorna `DATE_BEFORE_INITIAL` e nao abre a consulta de vendas no banco. O calculo usa `America/Sao_Paulo` tanto no Windows quanto na Vercel.
 
 Enquanto `initialDate` estiver `null`, `/vendas` e o sincronizador retornam `INITIAL_DATE_PENDING`. `/usuarios` continua disponivel. Uma data inicial futura produz uma lista de vendas vazia sem abrir conexao com o Firebird.
 
@@ -74,9 +74,18 @@ Nao sobrescreva um `.env` ja configurado. Preencha as variaveis conforme o ambie
 | UPSTASH_REDIS_REST_URL ou KV_REST_API_URL | Nao | Sim | Nao |
 | UPSTASH_REDIS_REST_TOKEN ou KV_REST_API_TOKEN | Nao | Sim | Nao |
 | INTEGRATION_API_URL | Nao | Nao | Sim |
-| FIREBIRD_HOST, PORT, DATABASE, USER, PASSWORD, ENCODING | Sim | Nao | Sim |
+| FIREBIRD_GATEWAY_URL, TOKEN_ID, HMAC_SECRET | Sim | Nao | Sim |
 
-Use dois tokens diferentes com pelo menos 32 caracteres aleatorios cada. `SYNC_BEARER_TOKEN` deve ser igual na Vercel e no Windows. O Club Moveleiro recebe somente a URL de producao e `API_BEARER_TOKEN`. O token Upstash precisa permitir GET e EVAL/SET e fica apenas na Vercel. A URL do Upstash deve ser a REST/HTTPS, nao a redis://.
+Use tokens de API diferentes com pelo menos 32 caracteres aleatorios cada. `SYNC_BEARER_TOKEN` so e necessario no modo 2. O Club Moveleiro recebe somente a URL de producao e `API_BEARER_TOKEN`. As tres variaveis `FIREBIRD_GATEWAY_*` sao secretas e nunca devem usar o prefixo `NEXT_PUBLIC_`. O token Upstash precisa permitir GET e EVAL/SET e fica apenas na Vercel no modo 2.
+
+No Windows TS, crie uma credencial exclusiva e ajuste o limite global de linhas do Gateway para pelo menos 20.000:
+
+```powershell
+.\SonoShowGateway.exe token-create api-sonoshow-club-moveleiro --rate-limit 300
+.\SonoShowGateway.exe configure
+```
+
+No configurador, altere **Max. linhas** para `20000` e reinicie o serviço do Gateway. A API recusa respostas marcadas como truncadas para nunca enviar um conjunto parcial ao Club Moveleiro.
 
 Use chave Redis diferente e dados de teste no ambiente de preview. `.env` esta excluido do Git. O script registra somente status e contagens, sem registros ou credenciais.
 
@@ -102,14 +111,16 @@ O SELECT prioriza `FUNCIONARIO.CPF` quando ele possui tamanho utilizavel e recor
 - Quantidade, valor e desconto devem ser numeros, nunca texto com virgula.
 - `pedido_data_venda` deve vir como texto `YYYY-MM-DD HH:MM:SS`, no horario do ERP. Formate no SELECT; nao ha conversao automatica para UTC.
 - `produto_ean` e uma extensao combinada diretamente com o Club Moveleiro. Ele e obrigatorio nesta integracao e sai como texto para preservar zeros iniciais. Um EAN nulo ou vazio interrompe a publicacao do snapshot.
-- O SELECT de vendas deve conter os parametros `:date_start` e `:date_end_exclusive`, aplicados diretamente sobre a coluna nativa de data: `data_venda >= CAST(:date_start AS TIMESTAMP) AND data_venda < CAST(:date_end_exclusive AS TIMESTAMP)`. Os valores sao parametrizados; nao sao concatenados no SQL.
-- Colunas extras nao sao expostas. Nenhuma rota aceita SQL do cliente. O leitor usa transacao somente leitura; configure tambem um usuario Firebird somente de consulta.
+- O SELECT de vendas deve conter os parametros `:date_start` e `:date_end_exclusive`, aplicados diretamente sobre a coluna nativa de data. Antes do envio, a aplicacao os converte para marcadores `?` e envia os valores separadamente ao Gateway; nenhum valor e concatenado no SQL.
+- Colunas extras nao sao expostas. Nenhuma rota aceita SQL do cliente. O Gateway executa as consultas em transacao somente leitura.
 
 No modo 1, o Firebird recebe a intersecao entre o periodo solicitado e o intervalo de `sales.initialDate` ate hoje. Quando o inicio nao e informado, a API usa o inicio do dia atual para impedir uma consulta historica acidental. No modo 2, o Windows extrai somente a janela movel de 90 dias e grava seus limites junto com o snapshot. A Vercel recusa um snapshot com janela diferente da configuracao e, na virada do dia, retorna 503 ate o Windows publicar um snapshot que cubra o novo dia.
 
 No modo 2, os parametros opcionais enviados pelo Club Moveleiro podem reduzir o periodo, mas nunca amplia-lo alem da janela em cache. No modo 1, podem consultar qualquer periodo cuja data inicial seja igual ou posterior a `sales.initialDate`, limitado ao dia atual. O filtro de produtos e aplicado depois da leitura nesta primeira versao; quando recebermos o SELECT e conhecermos o volume, ele podera ser levado ao Firebird de forma parametrizada.
 
-## Windows: validar e sincronizar
+## Windows: modo de snapshot opcional
+
+Esta secao so se aplica se `config/integration.json` voltar para `mode: 2`. Em `mode: 1`, usado atualmente, a Vercel consulta o Gateway diretamente e o agendamento que alimentava o Redis pode permanecer desativado.
 
 Primeiro, consulte e valide sem enviar dados:
 
@@ -129,7 +140,7 @@ Alternativa para o Agendador de Tarefas:
 powershell.exe -NoProfile -File "C:\Users\Jean\Documents\Codex\API\api-sonoshow\scripts\sync-windows.ps1"
 ```
 
-O wrapper usa a pasta correta independentemente da pasta inicial da tarefa. Configure, por exemplo, a cada 10 minutos para frescor maximo de 60 minutos, com **nao iniciar nova instancia** quando a anterior estiver em andamento. Nenhuma tarefa foi criada automaticamente. O usuario da tarefa precisa acessar Node.js, `.env` e Firebird. Mantenha o relogio do Windows sincronizado.
+O wrapper usa a pasta correta independentemente da pasta inicial da tarefa. Se o modo 2 for reativado, configure, por exemplo, a cada 10 minutos para frescor maximo de 60 minutos, com **nao iniciar nova instancia** quando a anterior estiver em andamento. O usuario da tarefa precisa acessar Node.js, `.env` e o Gateway. Mantenha o relogio do Windows sincronizado.
 
 O script calcula a janela uma vez no inicio, consulta e valida ambos os conjuntos e envia os limites junto com os dados. Usuarios invalidos e vendas sem CPF utilizavel de vendedor sao ignorados com contagem no log; outros erros de dados interrompem o envio. A publicacao Redis substitui usuarios e vendas atomicamente. Uploads iguais ou mais antigos retornam 409, preservando a extracao mais recente. Cada execucao substitui o conjunto completo: **nao envie somente deltas**. Listas vazias validas limpam o respectivo conjunto.
 
@@ -142,10 +153,10 @@ Saida 0 indica sucesso; 1 indica erro. Nao ha agendamento automatico ou retry ce
 1. Envie este projeto ao GitHub quando estiver pronto e importe o repositorio na Vercel.
 2. A raiz Vercel deve conter `package.json`. Se `api-sonoshow` ja e a raiz Git, deixe Root Directory vazio.
 3. Use preset Other, sem comando de build ou diretorio de saida customizado. `api/` contem as Functions e `vercel.json` define as rotas.
-4. Configure as variaveis conforme a tabela, publique e copie a URL de producao para `INTEGRATION_API_URL` no Windows.
-5. No modo 2, execute a primeira sincronizacao antes de liberar o acesso ao consumidor. Verifique se a URL de producao e acessivel ao Club Moveleiro; o Bearer Token da aplicacao continua obrigatorio.
+4. Configure `API_BEARER_TOKEN` e as tres variaveis `FIREBIRD_GATEWAY_*`, publique e teste `/usuarios` e `/vendas`.
+5. Verifique se a URL de producao e acessivel ao Club Moveleiro; o Bearer Token da aplicacao continua obrigatorio.
 
-Modo 1 exige endereco Firebird alcancavel a partir da Vercel. IP privado, `127.0.0.1` e caminho local nao criam conectividade entre ambientes. `FIREBIRD_DATABASE` identifica o banco no servidor Firebird. A implementacao nao resolve sozinha firewall, roteamento ou compatibilidade da versao/autenticacao do banco.
+Modo 1 exige o Gateway publico em HTTPS e uma credencial HMAC exclusiva deste projeto. O Gateway no Windows TS e o unico componente que mantem as credenciais e o endereco direto do Firebird.
 
 ## Endpoints
 
@@ -157,7 +168,7 @@ Modo 1 exige endereco Firebird alcancavel a partir da Vercel. IP privado, `127.0
 
 Os registros descartados por dados invalidos podem ser consultados com `SYNC_BEARER_TOKEN` em `GET /internal/rejeitados/usuarios` e `GET /internal/rejeitados/vendas`. A resposta informa a extracao, o total, o motivo e somente os identificadores necessarios para corrigir o Firebird. Esses endpoints internos nao aceitam `API_BEARER_TOKEN`.
 
-`GET /health` exige o token de leitura e informa processo ativo e modo. Nao comprova acesso ao Firebird nem frescor do cache.
+`GET /health` exige o token de leitura e informa processo ativo e modo. Nao executa consulta no Gateway.
 
 Teste local: `npm start`, acessivel somente em loopback. Para exercitar Upstash, configure uma base de teste e aponte `INTEGRATION_API_URL` para `http://127.0.0.1:3000`; HTTP e permitido apenas no localhost.
 
@@ -171,16 +182,16 @@ Invoke-RestMethod "$apiUrl/vendas?$query" -Method Post -Headers $apiHeaders -Con
 
 ## Limites e pendencias
 
-- Snapshot inteiro limitado a 3.000.000 bytes; ate 20.000 linhas por conjunto e 2.000 produtos por filtro. Excesso gera erro, sem truncamento. O limite fica abaixo do payload maximo das Vercel Functions; o plano Upstash precisa comportar o comando. Lotes/paginacao nao estao implementados: volumes maiores exigem adaptacao antes de producao.
+- A API aceita ate 20.000 linhas por conjunto e 2.000 produtos por filtro. O Gateway deve ter `max_rows` configurado para pelo menos 20.000; se ele indicar truncamento, a API retorna erro em vez de entregar dados incompletos. O limite de parametros do Gateway e respeitado pelo filtro de fornecedores.
 - Cada consulta no modo 2 carrega o snapshot completo de ate 90 dias. O frescor padrao e 1 hora; ajuste junto com a frequencia do script. Programe uma execucao logo apos a meia-noite para cobrir rapidamente a nova data.
 - No modo 2, a janela movel permite disponibilizar e atualizar os ultimos `lookbackDays`, respeitando a data inicial. Alteracoes em vendas mais antigas ficam fora da consulta. No modo 1, o historico desde `sales.initialDate` permanece consultavel.
 - Cache ausente, invalido ou vencido retorna 503, sem aparentar ausencia de usuarios/vendas.
 - Nao ha controle de enviados nem deduplicacao na API. Conforme alinhado com o desenvolvedor do Club Moveleiro, eles apagam e reinserem os dados do periodo processado para garantir unicidade e incorporar atualizacoes. A API preserva as linhas produzidas pelo SELECT; o `GROUP BY` do proprio SELECT continua consolidando seus itens conforme a regra fornecida.
 - A publicacao Redis e atomica; as duas consultas Firebird sao separadas e nao formam um snapshot transacional unico do ERP.
-- Faltam SELECTs, versao do Firebird, volume/historico necessario, credenciais e teste ponta a ponta na Vercel.
+- Antes da producao, valide volume, tempo dos SELECTs e o limite de linhas do Gateway com dados reais.
 
 ## Testes
 
 `npm test` usa o executor nativo do Node e dados sinteticos. Cobre modos, autenticacao, mascaras, filtros, uploads, expiracao e falhas. Nao usa credenciais nem altera servicos reais.
 
-Referencias: [Club Moveleiro](https://www.clubmoveleiro.com.br/integracao), [Vercel Node.js](https://vercel.com/docs/functions/runtimes/node-js), [limites Vercel](https://vercel.com/docs/functions/limitations), [Upstash REST](https://upstash.com/docs/redis/features/restapi), [driver Firebird](https://github.com/hgourvest/node-firebird).
+Referencias: [Club Moveleiro](https://www.clubmoveleiro.com.br/integracao), [Vercel Node.js](https://vercel.com/docs/functions/runtimes/node-js), [limites Vercel](https://vercel.com/docs/functions/limitations), [Upstash REST](https://upstash.com/docs/redis/features/restapi).
