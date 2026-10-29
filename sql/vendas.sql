@@ -37,9 +37,8 @@ WITH VENDAS AS (
       AND S.TIPOSAIDA IN ('1', '2', '9')
               /* SUPPLIER_FILTER */
         
-      
       AND S.DATASAIDA >= CAST(:date_start AS TIMESTAMP)
-      AND S.DATASAIDA < CAST(:date_end_exclusive AS TIMESTAMP)
+      AND S.DATASAIDA  <= CAST(:date_end_exclusive AS TIMESTAMP)
       AND NOT (I.QTDE - COALESCE(I.QTDEDEVOLVIDA, 0)) = 0
       AND P.SERVICO <> 'T'
       /*AND S.IDFILIAL NOT IN ('16')*/
