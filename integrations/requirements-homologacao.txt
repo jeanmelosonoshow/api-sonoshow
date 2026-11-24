@@ -1,0 +1,4 @@
+firebird-driver==2.0.3
+certifi==2026.7.22
+pywin32==311; sys_platform == "win32"
+

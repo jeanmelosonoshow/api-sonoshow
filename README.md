@@ -195,3 +195,10 @@ Invoke-RestMethod "$apiUrl/vendas?$query" -Method Post -Headers $apiHeaders -Con
 `npm test` usa o executor nativo do Node e dados sinteticos. Cobre modos, autenticacao, mascaras, filtros, uploads, expiracao e falhas. Nao usa credenciais nem altera servicos reais.
 
 Referencias: [Club Moveleiro](https://www.clubmoveleiro.com.br/integracao), [Vercel Node.js](https://vercel.com/docs/functions/runtimes/node-js), [limites Vercel](https://vercel.com/docs/functions/limitations), [Upstash REST](https://upstash.com/docs/redis/features/restapi).
+
+## Gateway de integracoes em homologacao
+
+O worker Windows generico para conectores futuros fica em `integrations/` e nao
+altera a API Vercel nem o executavel de producao. O primeiro conector e Flit para
+Firebird 3.0, inicialmente desativado e em dry-run. Consulte
+`docs/HOMOLOGACAO-FLIT-FIREBIRD.md` para contrato confirmado, limites e roteiro.

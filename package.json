@@ -8,6 +8,7 @@
     "start": "node --env-file=.env scripts/serve.js",
     "sync": "node --env-file=.env scripts/sync-windows.js",
     "sync:check": "node --env-file=.env scripts/sync-windows.js --check",
-    "test": "node --test"
+    "test": "node --test",
+    "test:homologacao": "python -m unittest discover -s integrations/tests -v"
   }
 }

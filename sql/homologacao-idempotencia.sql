@@ -1,0 +1,10 @@
+-- Executar uma unica vez no banco de producao somente apos aprovacao e backup.
+-- O gateway nunca executa este DDL automaticamente.
+CREATE TABLE SSG_IDEMPOTENCIA (
+    CONNECTOR VARCHAR(50) NOT NULL,
+    DATASET VARCHAR(50) NOT NULL,
+    EVENT_ID VARCHAR(64) NOT NULL,
+    APPLIED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT PK_SSG_IDEMPOTENCIA PRIMARY KEY (CONNECTOR, DATASET, EVENT_ID)
+);
+

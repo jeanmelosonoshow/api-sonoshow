@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "datasets": {
+    "jornadas": {
+      "enabled": false,
+      "sql": "",
+      "params": []
+    },
+    "excecoes": {
+      "enabled": false,
+      "sql": "",
+      "params": []
+    },
+    "marcacoes": {
+      "enabled": false,
+      "sql": "",
+      "params": []
+    },
+    "empresas": {
+      "enabled": false,
+      "sql": "",
+      "params": []
+    }
+  }
+}
+

@@ -1,0 +1,42 @@
+{
+  "profile": "homologacao",
+  "enabled": false,
+  "dryRun": true,
+  "productionGuard": {
+    "enabled": true,
+    "employeeCpfAllowlist": ["11447430794"],
+    "acknowledgeSource": false
+  },
+  "stateDir": "%PROGRAMDATA%/SonoShowGateway-Homologacao",
+  "mappingFile": "flit-firebird.mapping.json",
+  "schedule": {
+    "intervalSeconds": 900
+  },
+  "connector": {
+    "type": "flit",
+    "baseUrl": "https://api.flitapp.com.br",
+    "companies": [],
+    "datasets": {
+      "jornadas": { "enabled": true, "initialDate": "2026-11-01", "overlapDays": 2 },
+      "excecoes": { "enabled": true },
+      "marcacoes": { "enabled": false },
+      "empresas": { "enabled": false },
+      "situacao": { "enabled": false, "pendingOfficialEndpoint": true },
+      "admissoes": { "enabled": false, "pendingOfficialEndpoint": true },
+      "desligamentos": { "enabled": false, "pendingOfficialEndpoint": true },
+      "colaboradores": { "enabled": false, "pendingOfficialEndpoint": true },
+      "cargos": { "enabled": false, "pendingOfficialEndpoint": true },
+      "departamentos": { "enabled": false, "pendingOfficialEndpoint": true }
+    }
+  },
+  "target": {
+    "type": "firebird",
+    "environment": "production",
+    "host": "127.0.0.1",
+    "port": 3050,
+    "database": "",
+    "charset": "UTF8",
+    "clientLibrary": "C:/Program Files/Firebird/Firebird_3_0/fbclient.dll"
+  }
+}
+

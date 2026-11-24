@@ -5,3 +5,7 @@ node_modules/
 .vercel/
 work/
 *.log
+.venv*/
+dist/
+*.dpapi
+*.sqlite3*
